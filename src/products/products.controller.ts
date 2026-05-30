@@ -25,6 +25,12 @@ export class ProductsController {
         return this.products
     }
 
+    @Get(':id')
+    getOne(@Param('id') id: string){
+        const product = this.products.find(p => p.id === +id)
+        return product
+    }
+
     @Post()
     create(@Body() product: CreateProductDto){
         const newProduct = {
