@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put, Param } from "@nestjs/common";
+import { Body, Controller, Get, Post, Put, Delete, Param, NotFoundException } from "@nestjs/common";
 import { CreateProductDto } from "./dtos/create-product.dto";
 import { UpdateProductDto } from "./dtos/update-product.dto";
 
@@ -8,8 +8,6 @@ type productType = {
     name: string,
     price: number
 }
-
-
 
 @Controller('products')
 export class ProductsController {
@@ -28,6 +26,7 @@ export class ProductsController {
     @Get(':id')
     getOne(@Param('id') id: string){
         const product = this.products.find(p => p.id === +id)
+        if (!product) throw new NotFoundException('Product not found')
         return product
     }
 
@@ -44,8 +43,16 @@ export class ProductsController {
     @Put(':id')
     update(@Param('id') id: string, @Body() updateProduct: UpdateProductDto){
         const product = this.products.find(p => p.id === +id)
-        if (!product) return null
+        if (!product) throw new NotFoundException('Product not found')
         Object.assign(product, updateProduct)
         return product
+    }
+
+    @Delete(':id')
+    delete(@Param('id') id: string){
+        const index = this.products.findIndex(p => p.id === +id)
+        if (index === -1) return null
+        const deleted = this.products.splice(index, 1)
+        return deleted[0]
     }
 }
