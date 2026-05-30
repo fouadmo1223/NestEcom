@@ -12,7 +12,7 @@ type productType = {
 @Controller('products')
 export class ProductsController {
 
-    private products = [
+    private products: productType[]= [
         {id: 1, name: 'Product 1', price: 99.99},
         {id: 2, name: 'Product 2', price: 149.99},
         {id: 3, name: 'Product 3', price: 199.99}
