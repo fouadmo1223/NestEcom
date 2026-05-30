@@ -25,7 +25,7 @@ export class ProductsController {
     @Get(':id')
     getOne(@Param('id') id: string){
         const product = this.products.find(p => p.id === +id)
-if (!product) throw new NotFoundException('Product not found')
+        if (!product) throw new NotFoundException('Product not found')
         return product
     }
 
