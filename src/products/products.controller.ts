@@ -25,6 +25,11 @@ export class ProductsController {
 
     @Post()
     create(@Body() product: productType){
-        return product
+        const newProduct = {
+            id: this.products.length + 1,
+            ...product
+        }
+        this.products.push(newProduct)
+        return newProduct
     }
 }
