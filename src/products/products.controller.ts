@@ -2,7 +2,6 @@ import { Body, Controller, Get, Post, Put, Delete, Param, NotFoundException } fr
 import { CreateProductDto } from "./dtos/create-product.dto";
 import { UpdateProductDto } from "./dtos/update-product.dto";
 
-
 type productType = {
     id?: number,
     name: string,
@@ -26,7 +25,10 @@ export class ProductsController {
     @Get(':id')
     getOne(@Param('id') id: string){
         const product = this.products.find(p => p.id === +id)
-        if (!product) throw new NotFoundException('Product not found')
+        if (!product) throw new NotFoundException('Product not found',{
+            description: `No product with id ${id} exists`,
+            cause: new Error('Product not found')
+        })
         return product
     }
 
@@ -51,7 +53,7 @@ export class ProductsController {
     @Delete(':id')
     delete(@Param('id') id: string){
         const index = this.products.findIndex(p => p.id === +id)
-        if (index === -1) return null
+        if (index === -1) throw new NotFoundException('Product not found')
         const deleted = this.products.splice(index, 1)
         return deleted[0]
     }
