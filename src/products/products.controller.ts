@@ -36,7 +36,7 @@ export class ProductsController {
     }
 
     @Put(':id')
-    update(@Param('id') id: number, @Body() updateProduct: UpdateProductDto){
+    update(@Param('id') id: string, @Body() updateProduct: UpdateProductDto){
         const product = this.products.find(p => p.id === +id)
         if (!product) return null
         Object.assign(product, updateProduct)
