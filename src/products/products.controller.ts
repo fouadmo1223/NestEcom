@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Post } from "@nestjs/common";
+import { Body, Controller, Get, Post, Put, Param } from "@nestjs/common";
+import { CreateProductDto } from "./dtos/create-product.dto";
+import { UpdateProductDto } from "./dtos/update-product.dto";
 
 
 type productType = {
@@ -24,12 +26,20 @@ export class ProductsController {
     }
 
     @Post()
-    create(@Body() product: productType){
+    create(@Body() product: CreateProductDto){
         const newProduct = {
             id: this.products.length + 1,
             ...product
         }
         this.products.push(newProduct)
         return newProduct
+    }
+
+    @Put(':id')
+    update(@Param('id') id: number, @Body() updateProduct: UpdateProductDto){
+        const product = this.products.find(p => p.id === +id)
+        if (!product) return null
+        Object.assign(product, updateProduct)
+        return product
     }
 }
