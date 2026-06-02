@@ -40,8 +40,8 @@ export class ProductsController {
     }
 
     @Put(':id')
-    update(@Param('id') id: string, @Body() updateProduct: UpdateProductDto){
-        const product = this.products.find(p => p.id === +id)
+    update(@Param('id',ParseIntPipe) id: number, @Body() updateProduct: UpdateProductDto){
+        const product = this.products.find(p => p.id === id)
         if (!product) throw new NotFoundException('Product not found')
         Object.assign(product, updateProduct)
         return product
