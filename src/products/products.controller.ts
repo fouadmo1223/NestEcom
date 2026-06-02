@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Put, Delete, Param, NotFoundException } from "@nestjs/common";
+import { Body, Controller, Get, Post, Put, Delete, Param, NotFoundException, ParseIntPipe } from "@nestjs/common";
 import { CreateProductDto } from "./dtos/create-product.dto";
 import { UpdateProductDto } from "./dtos/update-product.dto";
 
@@ -23,8 +23,8 @@ export class ProductsController {
     }
 
     @Get(':id')
-    getOne(@Param('id') id: string){
-        const product = this.products.find(p => p.id === +id)
+    getOne(@Param('id',ParseIntPipe) id: number){
+        const product = this.products.find(p => p.id === id)
         if (!product) throw new NotFoundException('Product not found')
         return product
     }
