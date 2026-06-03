@@ -1,10 +1,22 @@
-import { Controller, Get } from "@nestjs/common";
-
+import { Controller, Get, Param, ParseIntPipe } from '@nestjs/common';
+import { ReviewsService } from './reviews.service';
 
 @Controller('reviews')
 export class ReviewsController {
+    constructor(private readonly reviewsService: ReviewsService) {}
+
     @Get()
-    getAll(){
-        return [{id: 1, productId: 1, rating: 5, comment: 'Great product'}, {id: 2, productId: 2, rating: 4, comment: 'Good product'}, {id: 3, productId: 3, rating: 3, comment: 'Average product'}]
+    getAll() {
+        return this.reviewsService.findAll();
+    }
+
+    @Get(':id')
+    getOne(@Param('id', ParseIntPipe) id: number) {
+        return this.reviewsService.findOne(id);
+    }
+
+    @Get('product/:productId')
+    getByProduct(@Param('productId', ParseIntPipe) productId: number) {
+        return this.reviewsService.findByProduct(productId);
     }
 }
