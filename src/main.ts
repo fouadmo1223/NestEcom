@@ -7,13 +7,15 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
+      forbidNonWhitelisted: true,
       exceptionFactory: (errors) =>
-        new BadRequestException(
-          errors.map((e) => ({
+        new BadRequestException({
+          message: 'Validation error',
+          errors: errors.map((e) => ({
             key: e.property,
             message: Object.values(e.constraints ?? {}).join(', '),
           })),
-        ),
+        }),
     }),
   );
   await app.listen(process.env.PORT ?? 3000);
