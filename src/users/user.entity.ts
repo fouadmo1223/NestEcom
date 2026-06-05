@@ -1,21 +1,21 @@
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { Review } from '../reviews/review.entity';
 
-@Entity({ name: 'products' })
-export class Product {
+@Entity({ name: 'users' })
+export class User {
     @PrimaryGeneratedColumn()
     id!: number;
 
+    @Column({ unique: true })
+    username!: string;
+
+    @Column({ unique: true })
+    email!: string;
+
     @Column()
-    title!: string;
+    password!: string;
 
-    @Column('decimal', { precision: 10, scale: 2 })
-    price!: number;
-
-    @Column({ nullable: true })
-    description!: string | null;
-
-    @OneToMany(() => Review, (review) => review.product)
+    @OneToMany(() => Review, (review) => review.user)
     reviews!: Review[];
 
     @CreateDateColumn()
