@@ -12,7 +12,7 @@ export class Product {
     price!: number;
 
     @Column({ nullable: true })
-    description!: string;
+    description!: string | null;
 
     @CreateDateColumn()
     createdAt!: Date;
