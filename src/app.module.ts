@@ -18,7 +18,7 @@ import { UsersModule } from './users/users.module';
             username: config.get<string>('DB_USERNAME'),
             password: config.get<string>('DB_PASSWORD'),
             database: config.get<string>('DB_NAME'),
-            entities: [ProductsModule, ReviewsModule, UsersModule],
+            autoLoadEntities: true,
             synchronize: config.get<string>('NODE_ENV') !== 'production',
          }),
       }),
