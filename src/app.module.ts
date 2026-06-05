@@ -1,21 +1,31 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProductsModule } from './products/products.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { UsersModule } from './users/users.module';
-import { TypeOrmModule } from '@nestjs/typeorm';
-
 
 @Module({
-   imports: [ProductsModule, ReviewsModule, UsersModule,TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: 'localhost',
-      port: 5432,
-      username: 'postgres',
-      password: '258258',
-      database: 'nestjs',
-      entities: [ProductsModule, ReviewsModule, UsersModule],
-      synchronize: true,
-   })],
+   imports: [
+      ConfigModule.forRoot({ isGlobal: true }),
+      TypeOrmModule.forRootAsync({
+         imports: [ConfigModule],
+         inject: [ConfigService],
+         useFactory: (config: ConfigService) => ({
+            type: 'postgres',
+            host: config.get<string>('DB_HOST'),
+            port: config.get<number>('DB_PORT'),
+            username: config.get<string>('DB_USERNAME'),
+            password: config.get<string>('DB_PASSWORD'),
+            database: config.get<string>('DB_NAME'),
+            entities: [ProductsModule, ReviewsModule, UsersModule],
+            synchronize: config.get<string>('NODE_ENV') !== 'production',
+         }),
+      }),
+      ProductsModule,
+      ReviewsModule,
+      UsersModule,
+   ],
    controllers: [],
    providers: [],
 })
