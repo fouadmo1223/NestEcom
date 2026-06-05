@@ -4,6 +4,7 @@ import { Review } from '../reviews/review.entity';
 export enum UserType {
     ADMIN = 'admin',
     USER = 'user',
+    SUPER_ADMIN="super_admin"
 }
 
 @Entity({ name: 'users' })
@@ -11,10 +12,10 @@ export class User {
     @PrimaryGeneratedColumn()
     id!: number;
 
-    @Column({ unique: true })
+    @Column({ unique: true ,type:'varchar',length: 150 })
     username!: string;
 
-    @Column({ unique: true })
+    @Column({ unique: true ,type:'varchar',length: 150 })
     email!: string;
 
     @Column()

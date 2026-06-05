@@ -1,5 +1,6 @@
-import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { Review } from '../reviews/review.entity';
+import { User } from '../users/user.entity';
 
 @Entity({ name: 'products' })
 export class Product {
@@ -14,6 +15,9 @@ export class Product {
 
     @Column({ nullable: true })
     description!: string | null;
+
+    @ManyToOne(() => User, { onDelete: 'CASCADE', })
+    createdBy!: User ;
 
     @OneToMany(() => Review, (review) => review.product)
     reviews!: Review[];
