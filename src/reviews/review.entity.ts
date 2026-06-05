@@ -10,7 +10,7 @@ export class Review {
     @Column({ type: 'int' })
     rating!: number;
 
-    @Column({ nullable: true })
+    @Column({ type: 'varchar', nullable: true })
     comment!: string | null;
 
     @ManyToOne(() => Product, (product) => product.reviews, { onDelete: 'CASCADE' })

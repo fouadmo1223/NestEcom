@@ -13,7 +13,7 @@ export class Product {
     @Column('decimal', { precision: 10, scale: 2 })
     price!: number;
 
-    @Column({ nullable: true })
+    @Column({ type: 'varchar', length: 255, nullable: true })
     description!: string | null;
 
     @ManyToOne(() => User, { onDelete: 'CASCADE', })
