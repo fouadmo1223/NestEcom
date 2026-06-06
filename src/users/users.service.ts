@@ -1,22 +1,48 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-
-type User = { id: number; username: string };
+import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcrypt';
+import { User } from './user.entity';
+import { RegisterDto } from './dtos/register.dto';
+import { LoginDto } from './dtos/login.dto';
 
 @Injectable()
 export class UsersService {
-    private users: User[] = [
-        { id: 1, username: 'user1' },
-        { id: 2, username: 'user2' },
-        { id: 3, username: 'user3' },
-    ];
+    constructor(
+        @InjectRepository(User)
+        private readonly usersRepository: Repository<User>,
+        private readonly jwtService: JwtService,
+    ) {}
 
-    findAll(): User[] {
-        return this.users;
+    findAll(): Promise<User[]> {
+        return this.usersRepository.find();
     }
 
-    findOne(id: number): User {
-        const user = this.users.find((u) => u.id === id);
+    async findOne(id: number): Promise<User> {
+        const user = await this.usersRepository.findOneBy({ id });
         if (!user) throw new NotFoundException('User not found');
         return user;
+    }
+
+    async register(dto: RegisterDto): Promise<User> {
+        const existing = await this.usersRepository.findOneBy({ email: dto.email });
+        if (existing) throw new BadRequestException('Email already in use');
+
+        const hashedPassword = await bcrypt.hash(dto.password, 10);
+        const user = this.usersRepository.create({ ...dto, password: hashedPassword });
+        return this.usersRepository.save(user);
+    }
+
+    async login(dto: LoginDto): Promise<{ accessToken: string; user: Omit<User, 'password'> }> {
+        const user = await this.usersRepository.findOneBy({ email: dto.email });
+        if (!user) throw new UnauthorizedException('Invalid credentials');
+
+        const passwordMatch = await bcrypt.compare(dto.password, user.password);
+        if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
+
+        const accessToken = this.jwtService.sign({ id: user.id, email: user.email, userType: user.userType });
+        const { password: _, ...userWithoutPassword } = user;
+        return { accessToken, user: userWithoutPassword };
     }
 }
