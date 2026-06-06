@@ -13,6 +13,7 @@ import { User } from './user.entity';
             imports: [ConfigModule],
             inject: [ConfigService],
             useFactory: (config: ConfigService) => ({
+                global: true,
                 secret: config.get<string>('JWT_SECRET'),
                 signOptions: { expiresIn: config.get('JWT_EXPIRES_IN', '7d') as any },
             }),
