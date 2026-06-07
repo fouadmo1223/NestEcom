@@ -7,6 +7,7 @@ import * as bcrypt from 'bcrypt';
 import { User, UserType } from './user.entity';
 import { RegisterDto } from './dtos/register.dto';
 import { LoginDto } from './dtos/login.dto';
+import { UpdateUserDto } from './dtos/update-user.dto';
 
 type AuthResponse = {
     accessToken: string;
@@ -62,6 +63,22 @@ export class UsersService {
             refreshToken: this.generateRefreshToken(payload),
             user: userWithoutPassword,
         };
+    }
+
+    async update(id: number, dto: UpdateUserDto, currentUser: { id: number; userType: UserType }): Promise<Omit<User, 'password'>> {
+        const user = await this.findOne(id);
+
+        if (currentUser.userType !== UserType.SUPER_ADMIN && currentUser.id !== id) {
+            throw new ForbiddenException('Access denied');
+        }
+
+        if (dto.password) {
+            dto.password = await bcrypt.hash(dto.password, 10);
+        }
+
+        Object.assign(user, dto);
+        await this.usersRepository.save(user);
+        return this.getCurrentUser(id);
     }
 
     async delete(id: number, currentUser: { id: number; userType: UserType }): Promise<User> {
