@@ -1,3 +1,4 @@
+import { Exclude } from 'class-transformer';
 import { Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { Review } from '../reviews/review.entity';
 
@@ -18,6 +19,7 @@ export class User {
     @Column({ unique: true ,type:'varchar',length: 150 })
     email!: string;
 
+    @Exclude()
     @Column()
     password!: string;
 

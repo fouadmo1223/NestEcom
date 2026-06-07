@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
-import { BadRequestException, ValidationPipe } from '@nestjs/common';
+import { BadRequestException, ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { LoggerInterceptor } from './utils/interceptors/logger.interceptor';
@@ -7,7 +8,7 @@ import { LoggerInterceptor } from './utils/interceptors/logger.interceptor';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.use(cookieParser());
-  app.useGlobalInterceptors(new LoggerInterceptor());
+  app.useGlobalInterceptors(new LoggerInterceptor(), new ClassSerializerInterceptor(app.get(Reflector)));
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
