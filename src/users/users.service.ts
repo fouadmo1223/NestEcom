@@ -64,6 +64,15 @@ export class UsersService {
         };
     }
 
+    async getCurrentUser(id: number): Promise<Omit<User, 'password'>> {
+        const user = await this.usersRepository.findOne({
+            where: { id },
+            select: { id: true, username: true, email: true, userType: true, isAccountVerified: true, createdAt: true, updatedAt: true },
+        });
+        if (!user) throw new NotFoundException('User not found');
+        return user;
+    }
+
     async refreshTokens(refreshToken: string): Promise<RefreshResponse> {
         try {
             const payload = this.jwtService.verify(refreshToken, {
