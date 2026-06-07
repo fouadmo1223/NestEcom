@@ -29,11 +29,22 @@ export class UsersService {
         private readonly configService: ConfigService,
     ) {}
 
-    findAll(): Promise<User[]> {
-        return this.usersRepository.find();
+    findAll(): Promise<Omit<User, 'password'>[]> {
+        return this.usersRepository.find({
+            select: { id: true, username: true, email: true, userType: true, isAccountVerified: true, createdAt: true, updatedAt: true },
+        });
     }
 
-    async findOne(id: number): Promise<User> {
+    async findOne(id: number): Promise<Omit<User, 'password'>> {
+        const user = await this.usersRepository.findOne({
+            where: { id },
+            select: { id: true, username: true, email: true, userType: true, isAccountVerified: true, createdAt: true, updatedAt: true },
+        });
+        if (!user) throw new NotFoundException('User not found');
+        return user;
+    }
+
+    private async findOneWithPassword(id: number): Promise<User> {
         const user = await this.usersRepository.findOneBy({ id });
         if (!user) throw new NotFoundException('User not found');
         return user;
@@ -66,7 +77,7 @@ export class UsersService {
     }
 
     async update(id: number, dto: UpdateUserDto, currentUser: { id: number; userType: UserType }): Promise<Omit<User, 'password'>> {
-        const user = await this.findOne(id);
+        const user = await this.findOneWithPassword(id);
 
         if (currentUser.userType !== UserType.SUPER_ADMIN && currentUser.id !== id) {
             throw new ForbiddenException('Access denied');
@@ -82,7 +93,7 @@ export class UsersService {
     }
 
     async delete(id: number, currentUser: { id: number; userType: UserType }): Promise<User> {
-        const user = await this.findOne(id);
+        const user = await this.findOneWithPassword(id);
 
         if (currentUser.userType !== UserType.SUPER_ADMIN && currentUser.id !== id) {
             throw new ForbiddenException('Access denied');
