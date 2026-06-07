@@ -1,10 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
-import { User } from './user.entity';
+import { User, UserType } from './user.entity';
 import { RegisterDto } from './dtos/register.dto';
 import { LoginDto } from './dtos/login.dto';
 
@@ -62,6 +62,16 @@ export class UsersService {
             refreshToken: this.generateRefreshToken(payload),
             user: userWithoutPassword,
         };
+    }
+
+    async delete(id: number, currentUser: { id: number; userType: UserType }): Promise<User> {
+        const user = await this.findOne(id);
+
+        if (currentUser.userType !== UserType.SUPER_ADMIN && currentUser.id !== id) {
+            throw new ForbiddenException('Access denied');
+        }
+
+        return this.usersRepository.remove(user);
     }
 
     async getCurrentUser(id: number): Promise<Omit<User, 'password'>> {

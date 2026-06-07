@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -26,5 +26,14 @@ export class UsersController {
     @Get(':id')
     getOne(@Param('id', ParseIntPipe) id: number) {
         return this.usersService.findOne(id);
+    }
+
+    @Delete(':id')
+    @UseGuards(JwtGuard)
+    delete(
+        @Param('id', ParseIntPipe) id: number,
+        @CurrentUser() currentUser: { id: number; userType: UserType },
+    ) {
+        return this.usersService.delete(id, currentUser);
     }
 }
