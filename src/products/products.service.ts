@@ -5,6 +5,7 @@ import { Product } from './product.entity';
 import { CreateProductDto } from './dtos/create-product.dto';
 import { UpdateProductDto } from './dtos/update-product.dto';
 import { UserType } from '../users/user.entity';
+import { slugify } from '../utils/slugify';
 
 type CurrentUser = { id: number; userType: UserType };
 
@@ -35,13 +36,18 @@ export class ProductsService {
     }
 
     create(dto: CreateProductDto, userId: number): Promise<Product> {
-        const product = this.productsRepository.create({ ...dto, createdBy: { id: userId } });
+        const product = this.productsRepository.create({
+            ...dto,
+            slug: slugify(dto.title),
+            createdBy: { id: userId },
+        });
         return this.productsRepository.save(product);
     }
 
     async update(id: number, dto: UpdateProductDto, currentUser: CurrentUser): Promise<Product> {
         const product = await this.findOne(id);
         this.checkOwnership(product, currentUser);
+        if (dto.title) product.slug = slugify(dto.title);
         Object.assign(product, dto);
         return this.productsRepository.save(product);
     }

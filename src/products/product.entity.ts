@@ -10,6 +10,9 @@ export class Product {
     @Column()
     title!: string;
 
+    @Column({ type: 'varchar', unique: true })
+    slug!: string;
+
     @Column('decimal', { precision: 10, scale: 2 })
     price!: number;
 
