@@ -20,16 +20,16 @@ export class ProductsService {
         if (currentUser.userType === UserType.ADMIN) {
             return this.productsRepository.find({
                 where: { createdBy: { id: currentUser.id } },
-                relations: { createdBy: true },
+                relations: { createdBy: true, reviews: true },
             });
         }
-        return this.productsRepository.find({ relations: { createdBy: true } });
+        return this.productsRepository.find({ relations: { createdBy: true, reviews: true } });
     }
 
     async findOne(id: number): Promise<Product> {
         const product = await this.productsRepository.findOne({
             where: { id },
-            relations: { createdBy: true },
+            relations: { createdBy: true, reviews: true },
         });
         if (!product) throw new NotFoundException('Product not found');
         return product;
