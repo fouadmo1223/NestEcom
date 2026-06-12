@@ -19,10 +19,10 @@ export class Product {
     @Column({ type: 'varchar', length: 255, nullable: true })
     description!: string | null;
 
-    @ManyToOne(() => User, { onDelete: 'CASCADE', })
+    @ManyToOne(() => User, { onDelete: 'CASCADE', eager: true })
     createdBy!: User ;
 
-    @OneToMany(() => Review, (review) => review.product)
+    @OneToMany(() => Review, (review) => review.product,{eager:true})
     reviews!: Review[];
 
     @CreateDateColumn()
