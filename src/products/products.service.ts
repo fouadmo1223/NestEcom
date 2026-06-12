@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Product } from './product.entity';
 import { CreateProductDto } from './dtos/create-product.dto';
 import { UpdateProductDto } from './dtos/update-product.dto';
+import { ProductsQueryDto } from './dtos/products-query.dto';
 import { UserType } from '../users/user.entity';
 import { slugify } from '../utils/slugify';
 
@@ -16,30 +17,50 @@ export class ProductsService {
         private readonly productsRepository: Repository<Product>,
     ) {}
 
-    findAll(currentUser: CurrentUser): Promise<Product[]> {
+    findAll(currentUser: CurrentUser, query: ProductsQueryDto): Promise<Product[]> {
+        const qb = this.productsRepository.createQueryBuilder('product')
+            .leftJoinAndSelect('product.createdBy', 'createdBy')
+            .leftJoinAndSelect('product.category', 'category');
+
         if (currentUser.userType === UserType.ADMIN) {
-            return this.productsRepository.find({
-                where: { createdBy: { id: currentUser.id } },
-                relations: { createdBy: true, reviews: true },
-            });
+            qb.andWhere('createdBy.id = :userId', { userId: currentUser.id });
         }
-        return this.productsRepository.find({ relations: { createdBy: true, reviews: true } });
+
+        if (query.title) {
+            qb.andWhere('product.title ILIKE :title', { title: `%${query.title}%` });
+        }
+
+        if (query.categoryId) {
+            qb.andWhere('category.id = :categoryId', { categoryId: Number(query.categoryId) });
+        }
+
+        if (query.minPrice) {
+            qb.andWhere('product.price >= :minPrice', { minPrice: Number(query.minPrice) });
+        }
+
+        if (query.maxPrice) {
+            qb.andWhere('product.price <= :maxPrice', { maxPrice: Number(query.maxPrice) });
+        }
+
+        return qb.getMany();
     }
 
     async findOne(id: number): Promise<Product> {
         const product = await this.productsRepository.findOne({
             where: { id },
-            relations: { createdBy: true, reviews: true },
+            relations: { createdBy: true, category: true },
         });
         if (!product) throw new NotFoundException('Product not found');
         return product;
     }
 
     create(dto: CreateProductDto, userId: number): Promise<Product> {
+        const { categoryId, ...rest } = dto;
         const product = this.productsRepository.create({
-            ...dto,
+            ...rest,
             slug: slugify(dto.title),
             createdBy: { id: userId },
+            ...(categoryId ? { category: { id: categoryId } } : {}),
         });
         return this.productsRepository.save(product);
     }

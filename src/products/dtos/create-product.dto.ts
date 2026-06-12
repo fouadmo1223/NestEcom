@@ -12,4 +12,8 @@ export class CreateProductDto {
     @IsOptional()
     @IsString({ message: 'Description must be a string' })
     description?: string;
+
+    @IsOptional()
+    @IsNumber({}, { message: 'Category ID must be a number' })
+    categoryId?: number;
 }

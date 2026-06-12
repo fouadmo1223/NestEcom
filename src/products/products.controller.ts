@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Post, Patch, Delete, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Patch, Delete, Param, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dtos/create-product.dto';
 import { UpdateProductDto } from './dtos/update-product.dto';
+import { ProductsQueryDto } from './dtos/products-query.dto';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -16,8 +17,8 @@ export class ProductsController {
 
     @Get()
     @UseGuards(JwtGuard)
-    getAll(@CurrentUser() user: CurrentUserPayload) {
-        return this.productsService.findAll(user);
+    getAll(@CurrentUser() user: CurrentUserPayload, @Query() query: ProductsQueryDto) {
+        return this.productsService.findAll(user, query);
     }
 
     @Get(':id')
