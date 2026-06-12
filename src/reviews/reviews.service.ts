@@ -18,8 +18,13 @@ export class ReviewsService {
         private readonly productsRepository: Repository<Product>,
     ) {}
 
-    findAll(): Promise<Review[]> {
-        return this.reviewsRepository.find({ relations: { user: true, product: true } });
+    async findAll(page: number, limit: number) {
+        const [data, total] = await this.reviewsRepository.findAndCount({
+            relations: { user: true, product: true },
+            skip: (page - 1) * limit,
+            take: limit,
+        });
+        return { data, pagination: { total, page, limit } };
     }
 
     async findOne(id: number): Promise<Review> {

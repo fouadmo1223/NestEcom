@@ -29,10 +29,13 @@ export class UsersService {
         private readonly configService: ConfigService,
     ) {}
 
-    findAll(): Promise<Omit<User, 'password'>[]> {
-        return this.usersRepository.find({
+    async findAll(page: number, limit: number) {
+        const [data, total] = await this.usersRepository.findAndCount({
             select: { id: true, username: true, email: true, userType: true, isAccountVerified: true, createdAt: true, updatedAt: true },
+            skip: (page - 1) * limit,
+            take: limit,
         });
+        return { data, pagination: { total, page, limit } };
     }
 
     async findOne(id: number): Promise<Omit<User, 'password'>> {

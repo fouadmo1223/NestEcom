@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Query, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -6,6 +6,7 @@ import { Roles } from '../auth/roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UserType } from './user.entity';
 import { UpdateUserDto } from './dtos/update-user.dto';
+import { PaginationDto } from '../common/dtos/pagination.dto';
 
 @Controller('users')
 export class UsersController {
@@ -14,8 +15,10 @@ export class UsersController {
     @Get()
     @Roles(UserType.SUPER_ADMIN)
     @UseGuards(JwtGuard, RolesGuard)
-    getAll() {
-        return this.usersService.findAll();
+    getAll(@Query() { page, limit }: PaginationDto) {
+        const p = Math.max(1, Number(page) || 1);
+        const l = Math.min(100, Math.max(1, Number(limit) || 10));
+        return this.usersService.findAll(p, l);
     }
 
     @Get('me')

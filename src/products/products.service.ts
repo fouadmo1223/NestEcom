@@ -17,7 +17,10 @@ export class ProductsService {
         private readonly productsRepository: Repository<Product>,
     ) {}
 
-    findAll(currentUser: CurrentUser, query: ProductsQueryDto): Promise<Product[]> {
+    async findAll(currentUser: CurrentUser, query: ProductsQueryDto) {
+        const page = Math.max(1, Number(query.page) || 1);
+        const limit = Math.min(100, Math.max(1, Number(query.limit) || 10));
+
         const qb = this.productsRepository.createQueryBuilder('product')
             .leftJoinAndSelect('product.createdBy', 'createdBy')
             .leftJoinAndSelect('product.category', 'category');
@@ -42,7 +45,10 @@ export class ProductsService {
             qb.andWhere('product.price <= :maxPrice', { maxPrice: Number(query.maxPrice) });
         }
 
-        return qb.getMany();
+        qb.skip((page - 1) * limit).take(limit);
+
+        const [data, total] = await qb.getManyAndCount();
+        return { data, pagination: { total, page, limit } };
     }
 
     async findOne(id: number): Promise<Product> {

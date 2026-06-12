@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dtos/create-review.dto';
 import { UpdateReviewDto } from './dtos/update-review.dto';
 import { JwtGuard } from '../auth/jwt.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UserType } from '../users/user.entity';
+import { PaginationDto } from '../common/dtos/pagination.dto';
 
 type CurrentUserPayload = { id: number; userType: UserType };
 
@@ -13,8 +14,10 @@ export class ReviewsController {
     constructor(private readonly reviewsService: ReviewsService) {}
 
     @Get()
-    getAll() {
-        return this.reviewsService.findAll();
+    getAll(@Query() { page, limit }: PaginationDto) {
+        const p = Math.max(1, Number(page) || 1);
+        const l = Math.min(100, Math.max(1, Number(limit) || 10));
+        return this.reviewsService.findAll(p, l);
     }
 
     @Get('product/:productId')
