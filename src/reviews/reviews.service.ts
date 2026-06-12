@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Review } from './review.entity';
+import { Product } from '../products/product.entity';
 import { CreateReviewDto } from './dtos/create-review.dto';
 import { UpdateReviewDto } from './dtos/update-review.dto';
 import { UserType } from '../users/user.entity';
@@ -13,6 +14,8 @@ export class ReviewsService {
     constructor(
         @InjectRepository(Review)
         private readonly reviewsRepository: Repository<Review>,
+        @InjectRepository(Product)
+        private readonly productsRepository: Repository<Product>,
     ) {}
 
     findAll(): Promise<Review[]> {
@@ -35,7 +38,10 @@ export class ReviewsService {
         });
     }
 
-    create(dto: CreateReviewDto, userId: number): Promise<Review> {
+    async create(dto: CreateReviewDto, userId: number): Promise<Review> {
+        const product = await this.productsRepository.findOneBy({ id: dto.productId });
+        if (!product) throw new NotFoundException('Product not found');
+
         const review = this.reviewsRepository.create({
             rating: dto.rating,
             comment: dto.comment,
