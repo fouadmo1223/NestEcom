@@ -48,7 +48,7 @@ export class ProductsService {
         qb.skip((page - 1) * limit).take(limit);
 
         const [data, total] = await qb.getManyAndCount();
-        return { data, pagination: { total, page, limit } };
+        return { data, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } };
     }
 
     async findOne(id: number): Promise<Product> {

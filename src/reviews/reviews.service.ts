@@ -24,7 +24,7 @@ export class ReviewsService {
             skip: (page - 1) * limit,
             take: limit,
         });
-        return { data, pagination: { total, page, limit } };
+        return { data, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } };
     }
 
     async findOne(id: number): Promise<Review> {
