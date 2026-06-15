@@ -113,6 +113,13 @@ export class UsersService {
         return user;
     }
 
+    async updateProfileImage(userId: number, imageUrl: string): Promise<Omit<User, 'password'>> {
+        const user = await this.findOneWithPassword(userId);
+        user.profileImage = imageUrl;
+        await this.usersRepository.save(user);
+        return this.getCurrentUser(userId);
+    }
+
     async refreshTokens(refreshToken: string): Promise<RefreshResponse> {
         try {
             const payload = this.jwtService.verify(refreshToken, {

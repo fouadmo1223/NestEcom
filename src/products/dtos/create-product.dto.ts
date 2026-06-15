@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import { IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateProductDto {
@@ -5,6 +6,7 @@ export class CreateProductDto {
     @IsNotEmpty({ message: 'Title is required' })
     title!: string;
 
+    @Transform(({ value }) => Number(value))
     @IsNumber({}, { message: 'Price must be a number' })
     @Min(0, { message: 'Price must be at least 0' })
     price!: number;
@@ -14,6 +16,7 @@ export class CreateProductDto {
     description?: string;
 
     @IsOptional()
+    @Transform(({ value }) => (value ? Number(value) : undefined))
     @IsNumber({}, { message: 'Category ID must be a number' })
     categoryId?: number;
 }

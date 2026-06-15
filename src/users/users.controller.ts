@@ -1,4 +1,6 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { imageMulterOptions } from '../uploads/multer.config';
 import { UsersService } from './users.service';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -25,6 +27,17 @@ export class UsersController {
     @UseGuards(JwtGuard)
     getMe(@CurrentUser() user: { id: number }) {
         return this.usersService.getCurrentUser(user.id);
+    }
+
+    @Patch('me/profile-image')
+    @UseGuards(JwtGuard)
+    @UseInterceptors(FileInterceptor('image', imageMulterOptions))
+    uploadProfileImage(
+        @CurrentUser() user: { id: number },
+        @UploadedFile() file: Express.Multer.File,
+    ) {
+        if (!file) throw new BadRequestException('No image uploaded');
+        return this.usersService.updateProfileImage(user.id, `/uploads/files/${file.filename}`);
     }
 
     @Get(':id')

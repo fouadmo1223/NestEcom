@@ -29,6 +29,9 @@ export class User {
     @Column({ default: false })
     isAccountVerified!: boolean;
 
+    @Column({ type: 'varchar', nullable: true })
+    profileImage!: string | null;
+
     @OneToMany(() => Review, (review) => review.user)
     reviews!: Review[];
 

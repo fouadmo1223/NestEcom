@@ -60,22 +60,24 @@ export class ProductsService {
         return product;
     }
 
-    create(dto: CreateProductDto, userId: number): Promise<Product> {
+    create(dto: CreateProductDto, userId: number, imageUrl: string): Promise<Product> {
         const { categoryId, ...rest } = dto;
         const product = this.productsRepository.create({
             ...rest,
             slug: slugify(dto.title),
+            image: imageUrl,
             createdBy: { id: userId },
             ...(categoryId ? { category: { id: categoryId } } : {}),
         });
         return this.productsRepository.save(product);
     }
 
-    async update(id: number, dto: UpdateProductDto, currentUser: CurrentUser): Promise<Product> {
+    async update(id: number, dto: UpdateProductDto, currentUser: CurrentUser, imageUrl?: string): Promise<Product> {
         const product = await this.findOne(id);
         this.checkOwnership(product, currentUser);
         if (dto.title) product.slug = slugify(dto.title);
         Object.assign(product, dto);
+        if (imageUrl) product.image = imageUrl;
         return this.productsRepository.save(product);
     }
 

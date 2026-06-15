@@ -20,6 +20,9 @@ export class Product {
     @Column({ type: 'varchar', length: 255, nullable: true })
     description!: string | null;
 
+    @Column({ type: 'varchar', nullable: true })
+    image!: string | null;
+
     @ManyToOne(() => User, { onDelete: 'CASCADE', eager: true })
     createdBy!: User;
 

@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, Patch, Delete, Param, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dtos/create-product.dto';
 import { UpdateProductDto } from './dtos/update-product.dto';
@@ -8,6 +9,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UserType } from '../users/user.entity';
+import { imageMulterOptions } from '../uploads/multer.config';
 
 type CurrentUserPayload = { id: number; userType: UserType };
 
@@ -29,19 +31,27 @@ export class ProductsController {
     @Post()
     @UseGuards(JwtGuard, RolesGuard)
     @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
-    create(@Body() dto: CreateProductDto, @CurrentUser() user: CurrentUserPayload) {
-        return this.productsService.create(dto, user.id);
+    @UseInterceptors(FileInterceptor('image', imageMulterOptions))
+    create(
+        @Body() dto: CreateProductDto,
+        @CurrentUser() user: CurrentUserPayload,
+        @UploadedFile() file: Express.Multer.File,
+    ) {
+        if (!file) throw new BadRequestException('Product image is required');
+        return this.productsService.create(dto, user.id, `/uploads/files/${file.filename}`);
     }
 
     @Patch(':id')
     @UseGuards(JwtGuard, RolesGuard)
     @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
+    @UseInterceptors(FileInterceptor('image', imageMulterOptions))
     update(
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: UpdateProductDto,
         @CurrentUser() user: CurrentUserPayload,
+        @UploadedFile() file?: Express.Multer.File,
     ) {
-        return this.productsService.update(id, dto, user);
+        return this.productsService.update(id, dto, user, file ? `/uploads/files/${file.filename}` : undefined);
     }
 
     @Delete(':id')
