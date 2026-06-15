@@ -1,6 +1,8 @@
 import {
   Controller,
   Post,
+  Delete,
+  Param,
   UploadedFile,
   UploadedFiles,
   UseGuards,
@@ -11,6 +13,7 @@ import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { JwtGuard } from '../auth/jwt.guard';
+import { UploadService } from './upload.service';
 
 const storage = diskStorage({
   destination: './src/uploads/files',
@@ -30,17 +33,24 @@ const imageFilter = (_req: any, file: Express.Multer.File, cb: any) => {
 @UseGuards(JwtGuard)
 @Controller('upload')
 export class UploadController {
+  constructor(private readonly uploadService: UploadService) {}
+
   @Post('image')
   @UseInterceptors(FileInterceptor('file', { storage, fileFilter: imageFilter, limits: { fileSize: 5 * 1024 * 1024 } }))
   uploadImage(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('No file uploaded');
-    return { url: `/uploads/files/${file.filename}`, filename: file.filename, originalName: file.originalname, size: file.size };
+    return this.uploadService.fileResponse(file);
   }
 
   @Post('images')
   @UseInterceptors(FilesInterceptor('files', 10, { storage, fileFilter: imageFilter, limits: { fileSize: 5 * 1024 * 1024 } }))
   uploadImages(@UploadedFiles() files: Express.Multer.File[]) {
     if (!files?.length) throw new BadRequestException('No files uploaded');
-    return files.map(file => ({ url: `/uploads/files/${file.filename}`, filename: file.filename, originalName: file.originalname, size: file.size }));
+    return this.uploadService.filesResponse(files);
+  }
+
+  @Delete(':filename')
+  deleteFile(@Param('filename') filename: string) {
+    return this.uploadService.deleteFile(filename);
   }
 }
