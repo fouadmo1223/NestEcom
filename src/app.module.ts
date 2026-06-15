@@ -6,6 +6,7 @@ import { ReviewsModule } from './reviews/reviews.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { CategoriesModule } from './categories/categories.module';
+import { UploadModule } from './uploads/upload.module';
 
 @Module({
    imports: [
@@ -29,6 +30,7 @@ import { CategoriesModule } from './categories/categories.module';
       UsersModule,
       AuthModule,
       CategoriesModule,
+      UploadModule,
    ],
    controllers: [],
    providers: [
