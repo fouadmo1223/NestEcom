@@ -10,6 +10,9 @@ import { UploadModule } from './uploads/upload.module';
 import { MailModule } from './mail/mail.module';
 import { CartModule } from './cart/cart.module';
 import { WishlistModule } from './wishlist/wishlist.module';
+import { AddressesModule } from './addresses/addresses.module';
+import { CouponsModule } from './coupons/coupons.module';
+import { OrdersModule } from './orders/orders.module';
 
 @Module({
    imports: [
@@ -37,6 +40,9 @@ import { WishlistModule } from './wishlist/wishlist.module';
       MailModule,
       CartModule,
       WishlistModule,
+      AddressesModule,
+      CouponsModule,
+      OrdersModule,
    ],
    controllers: [],
    providers: [

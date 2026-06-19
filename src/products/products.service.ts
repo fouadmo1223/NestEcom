@@ -10,6 +10,12 @@ import { slugify } from '../utils/slugify';
 
 type CurrentUser = { id: number; userType: UserType };
 
+const AVG_RATING_SUBQUERY = `(
+    SELECT COALESCE(ROUND(AVG(r.rating)::numeric, 1), 0)
+    FROM reviews r
+    WHERE r."productId" = product.id
+)`;
+
 @Injectable()
 export class ProductsService {
     constructor(
@@ -18,46 +24,64 @@ export class ProductsService {
     ) {}
 
     async findAll(currentUser: CurrentUser, query: ProductsQueryDto) {
-        const page = Math.max(1, Number(query.page) || 1);
+        const page  = Math.max(1, Number(query.page)  || 1);
         const limit = Math.min(100, Math.max(1, Number(query.limit) || 10));
 
         const qb = this.productsRepository.createQueryBuilder('product')
             .leftJoinAndSelect('product.createdBy', 'createdBy')
-            .leftJoinAndSelect('product.category', 'category');
+            .leftJoinAndSelect('product.category', 'category')
+            .leftJoinAndSelect('product.reviews', 'reviews')
+            .addSelect(AVG_RATING_SUBQUERY, 'avgRating');
 
         if (currentUser.userType === UserType.ADMIN) {
             qb.andWhere('createdBy.id = :userId', { userId: currentUser.id });
         }
 
-        if (query.title) {
-            qb.andWhere('product.title ILIKE :title', { title: `%${query.title}%` });
+        const searchTerm = query.search ?? query.title;
+        if (searchTerm) {
+            qb.andWhere(
+                '(product.title ILIKE :search OR product.description ILIKE :search)',
+                { search: `%${searchTerm}%` },
+            );
         }
 
         if (query.categoryId) {
             qb.andWhere('category.id = :categoryId', { categoryId: Number(query.categoryId) });
         }
-
         if (query.minPrice) {
             qb.andWhere('product.price >= :minPrice', { minPrice: Number(query.minPrice) });
         }
-
         if (query.maxPrice) {
             qb.andWhere('product.price <= :maxPrice', { maxPrice: Number(query.maxPrice) });
         }
 
-        qb.skip((page - 1) * limit).take(limit);
+        const sortOrder = query.sortOrder ?? 'DESC';
+        if (query.sortBy === 'price') {
+            qb.orderBy('product.price', sortOrder);
+        } else if (query.sortBy === 'avgRating') {
+            qb.orderBy(AVG_RATING_SUBQUERY, sortOrder);
+        } else {
+            qb.orderBy('product.createdAt', sortOrder);
+        }
 
-        const [data, total] = await qb.getManyAndCount();
+        const total = await qb.getCount();
+        const { entities, raw } = await qb.skip((page - 1) * limit).take(limit).getRawAndEntities();
+
+        const data = entities.map((entity, i) => ({
+            ...entity,
+            avgRating: parseFloat(raw[i]?.avgRating ?? '0'),
+        }));
+
         return { data, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } };
     }
 
-    async findOne(id: number): Promise<Product> {
+    async findOne(id: number): Promise<Product & { avgRating: number }> {
         const product = await this.productsRepository.findOne({
             where: { id },
-            relations: { createdBy: true, category: true },
+            relations: { createdBy: true, category: true, reviews: true },
         });
         if (!product) throw new NotFoundException('Product not found');
-        return product;
+        return Object.assign(product, { avgRating: product.avgRating });
     }
 
     create(dto: CreateProductDto, userId: number, imageUrl: string): Promise<Product> {
@@ -85,6 +109,10 @@ export class ProductsService {
         const product = await this.findOne(id);
         this.checkOwnership(product, currentUser);
         return this.productsRepository.remove(product);
+    }
+
+    async decrementStock(productId: number, quantity: number): Promise<void> {
+        await this.productsRepository.decrement({ id: productId }, 'stock', quantity);
     }
 
     private checkOwnership(product: Product, currentUser: CurrentUser): void {

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import type { Order } from '../orders/order.entity';
 
 @Injectable()
 export class MailService {
@@ -57,5 +58,58 @@ export class MailService {
       </div>
     `;
     return this.sendMail(to, 'Your password reset code', `Your password reset code is: ${code}`, html);
+  }
+
+  async sendOrderConfirmation(to: string, order: Order) {
+    const rows = order.items.map(
+      (item) => `<tr>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb">${item.productTitle}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:center">${item.quantity}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right">$${Number(item.unitPrice).toFixed(2)}</td>
+        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right">$${Number(item.total).toFixed(2)}</td>
+      </tr>`,
+    ).join('');
+
+    const html = `
+      <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:8px">
+        <h2 style="color:#111827">Order Confirmed #${order.id}</h2>
+        <p style="color:#374151">Thank you for your order! We'll notify you when it ships.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0">
+          <thead>
+            <tr style="background:#f3f4f6">
+              <th style="padding:8px;text-align:left">Product</th>
+              <th style="padding:8px;text-align:center">Qty</th>
+              <th style="padding:8px;text-align:right">Unit Price</th>
+              <th style="padding:8px;text-align:right">Total</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div style="text-align:right;margin-top:8px">
+          <p style="color:#374151">Subtotal: <strong>$${Number(order.subtotal).toFixed(2)}</strong></p>
+          ${order.discountAmount ? `<p style="color:#10b981">Discount: -$${Number(order.discountAmount).toFixed(2)}</p>` : ''}
+          <p style="font-size:18px;font-weight:700;color:#111827">Total: $${Number(order.total).toFixed(2)}</p>
+        </div>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0"/>
+        <p style="color:#6b7280;font-size:13px">
+          Shipping to: ${order.shippingAddress.fullName}, ${order.shippingAddress.street},
+          ${order.shippingAddress.city}, ${order.shippingAddress['country']}
+        </p>
+      </div>`;
+
+    return this.sendMail(to, `Order Confirmed #${order.id}`, `Your order #${order.id} has been confirmed. Total: $${Number(order.total).toFixed(2)}`, html);
+  }
+
+  async sendOrderShipped(to: string, order: Order) {
+    const tracking = order.trackingNumber ? `<p style="color:#374151">Tracking number: <strong>${order.trackingNumber}</strong></p>` : '';
+    const html = `
+      <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:8px">
+        <h2 style="color:#111827">Your order is on its way! 🚚</h2>
+        <p style="color:#374151">Order <strong>#${order.id}</strong> has been shipped.</p>
+        ${tracking}
+        <p style="color:#374151">Shipping to: ${order.shippingAddress.fullName}, ${order.shippingAddress.street}, ${order.shippingAddress.city}</p>
+      </div>`;
+
+    return this.sendMail(to, `Order #${order.id} Shipped`, `Your order #${order.id} is on its way!`, html);
   }
 }
