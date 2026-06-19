@@ -7,6 +7,7 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { CategoriesModule } from './categories/categories.module';
 import { UploadModule } from './uploads/upload.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
    imports: [
@@ -31,6 +32,7 @@ import { UploadModule } from './uploads/upload.module';
       AuthModule,
       CategoriesModule,
       UploadModule,
+      MailModule,
    ],
    controllers: [],
    providers: [
