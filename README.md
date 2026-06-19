@@ -17,7 +17,7 @@ A full-featured e-commerce REST API built with **NestJS**, **TypeORM**, and **Po
 - Coupon / discount codes (percentage or fixed)
 - User shipping addresses
 - Transactional emails (OTP, order confirmed, order shipped)
-- File uploads (product images, category images, profile images)
+- Cloud image uploads via **Cloudinary** — every image gets a permanent public URL
 - Admin: ban / unban users
 - Admin Analytics dashboard (revenue, best-selling products, orders by status, user growth)
 
@@ -50,11 +50,21 @@ JWT_EXPIRES_IN=15m
 JWT_REFRESH_SECRET=your_refresh_secret
 JWT_REFRESH_EXPIRES_IN=7d
 
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
 MAIL_HOST=smtp.gmail.com
 MAIL_PORT=587
 MAIL_USER=your@gmail.com
 MAIL_PASS=your_app_password
+
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+GOOGLE_CALLBACK_URL=http://localhost:3001/auth/google/callback
 ```
+
+Get your Cloudinary credentials free at [cloudinary.com](https://cloudinary.com) → Dashboard.
 
 ### 3. Run
 
@@ -247,7 +257,17 @@ PATCH /users/me/profile-image
 ```
 `multipart/form-data` with field `image` (jpg/jpeg/png/gif/webp, max 5MB).
 
-**Response 200** — updated user object.
+The image is uploaded to Cloudinary and a permanent public URL is saved.
+
+**Response 200**
+```json
+{
+  "id": 1,
+  "username": "john",
+  "email": "john@example.com",
+  "profileImage": "https://res.cloudinary.com/yourcloud/image/upload/profiles/abc123.jpg"
+}
+```
 
 ---
 
@@ -339,7 +359,8 @@ Public endpoint — no token required. If a valid token is provided, ADMIN users
       "price": "49.99",
       "stock": 25,
       "avgRating": 4.3,
-      "image": "/uploads/files/...",
+      "image": "https://res.cloudinary.com/yourcloud/image/upload/products/abc123.jpg",
+      "tags": ["new", "sale"],
       "category": { "id": 2, "name": "Electronics" },
       "reviews": [...]
     }
@@ -372,19 +393,32 @@ Returns up to 6 products from the same category, ordered by rating. Falls back t
 ```
 POST /products
 ```
-`multipart/form-data`:
+Content-Type: `multipart/form-data`
 
-| Field | Type | Required |
-|---|---|---|
-| `image` | file | Yes |
-| `title` | string | Yes |
-| `price` | number | Yes |
-| `description` | string | No |
-| `categoryId` | number | No |
-| `stock` | number | No (default: 0) |
-| `tags` | comma-separated string | No — values: `new`, `sale`, `featured` |
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `image` | file | Yes | Uploaded to Cloudinary automatically |
+| `title` | string | Yes | |
+| `price` | number | Yes | |
+| `description` | string | No | |
+| `categoryId` | number | No | |
+| `stock` | number | No | Default: 0 |
+| `tags` | string | No | Comma-separated: `new`, `sale`, `featured` |
 
-Example tags value: `new,sale`
+Example `tags` value: `new,sale`
+
+**Response 201**
+```json
+{
+  "id": 4,
+  "title": "Wireless Headphones",
+  "price": "49.99",
+  "stock": 25,
+  "image": "https://res.cloudinary.com/yourcloud/image/upload/products/abc123.jpg",
+  "tags": ["new", "sale"],
+  "category": { "id": 2, "name": "Electronics" }
+}
+```
 
 ---
 
@@ -423,12 +457,21 @@ GET /categories/:id
 ```
 POST /categories
 ```
-`multipart/form-data`:
+Content-Type: `multipart/form-data`
 
-| Field | Type | Required |
-|---|---|---|
-| `name` | string | Yes |
-| `image` | file | No |
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string | Yes | |
+| `image` | file | No | Uploaded to Cloudinary automatically |
+
+**Response 201**
+```json
+{
+  "id": 2,
+  "name": "Electronics",
+  "image": "https://res.cloudinary.com/yourcloud/image/upload/categories/xyz789.jpg"
+}
+```
 
 ---
 
@@ -436,7 +479,7 @@ POST /categories
 ```
 PATCH /categories/:id
 ```
-Same fields, all optional.
+Same fields, all optional. New image replaces the old one on Cloudinary.
 
 ---
 
@@ -856,12 +899,25 @@ Both query params are optional.
 
 ## File Uploads
 
-Static files served at:
+All images (products, categories, profile pictures) are stored on **Cloudinary** and returned as permanent public URLs — no local storage, no server dependency.
+
+| Upload point | Endpoint | Cloudinary folder |
+|---|---|---|
+| Product image | `POST /products` or `PATCH /products/:id` | `products/` |
+| Category image | `POST /categories` or `PATCH /categories/:id` | `categories/` |
+| Profile picture | `PATCH /users/me/profile-image` | `profiles/` |
+
+**Rules**
+- Content-Type: `multipart/form-data`, field name: `image`
+- Allowed types: `jpg`, `jpeg`, `png`, `gif`, `webp`
+- Max size: **5 MB**
+
+**Returned URL format**
 ```
-GET /uploads/files/:filename
+https://res.cloudinary.com/<cloud_name>/image/upload/<folder>/<public_id>.jpg
 ```
 
-Limits: max **5 MB**, allowed types: `jpg`, `jpeg`, `png`, `gif`, `webp`.
+You can paste this URL directly into an `<img>` tag or `Image` component — it works from anywhere.
 
 ---
 
@@ -888,8 +944,12 @@ Limits: max **5 MB**, allowed types: `jpg`, `jpeg`, `png`, `gif`, `webp`.
 
 ## Tech Stack
 
-- **Framework:** NestJS
-- **Database:** PostgreSQL + TypeORM
-- **Auth:** JWT (access + refresh) + bcrypt
-- **Email:** Nodemailer (Gmail SMTP)
-- **File uploads:** Multer
+| Layer | Technology |
+|---|---|
+| Framework | NestJS |
+| Database | PostgreSQL + TypeORM |
+| Auth | JWT (access 15m + refresh 7d) + bcrypt |
+| OAuth | Google OAuth 2.0 via Passport |
+| Email | Nodemailer (Gmail SMTP) |
+| Image storage | Cloudinary |
+| File handling | Multer (memory storage → Cloudinary) |
