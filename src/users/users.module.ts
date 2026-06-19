@@ -5,12 +5,14 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { User } from './user.entity';
+import { Otp } from './otp.entity';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
     imports: [
-        TypeOrmModule.forFeature([User]),
+        TypeOrmModule.forFeature([User, Otp]),
         JwtModule.registerAsync({
             imports: [ConfigModule],
             inject: [ConfigService],
@@ -20,6 +22,7 @@ import { RolesGuard } from '../auth/roles.guard';
                 signOptions: { expiresIn: config.get('JWT_EXPIRES_IN', '7d') as any },
             }),
         }),
+        MailModule,
     ],
     controllers: [UsersController],
     providers: [UsersService, JwtGuard, RolesGuard],

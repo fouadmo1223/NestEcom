@@ -5,9 +5,14 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { User, UserType } from './user.entity';
+import { Otp, OtpType } from './otp.entity';
 import { RegisterDto } from './dtos/register.dto';
 import { LoginDto } from './dtos/login.dto';
 import { UpdateUserDto } from './dtos/update-user.dto';
+import { MailService } from '../mail/mail.service';
+
+const OTP_RATE_LIMIT_MS = 5 * 60 * 1000; // 5 minutes
+const OTP_EXPIRY_MS = 10 * 60 * 1000;    // 10 minutes
 
 type AuthResponse = {
     accessToken: string;
@@ -25,8 +30,11 @@ export class UsersService {
     constructor(
         @InjectRepository(User)
         private readonly usersRepository: Repository<User>,
+        @InjectRepository(Otp)
+        private readonly otpRepository: Repository<Otp>,
         private readonly jwtService: JwtService,
         private readonly configService: ConfigService,
+        private readonly mailService: MailService,
     ) {}
 
     async findAll(page: number, limit: number) {
@@ -70,7 +78,7 @@ export class UsersService {
         if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
 
         const payload = { id: user.id, email: user.email, userType: user.userType };
-        const { password: _, ...userWithoutPassword } = user;
+        const { password: _pw, ...userWithoutPassword } = user;
 
         return {
             accessToken: this.generateAccessToken(payload),
@@ -135,6 +143,96 @@ export class UsersService {
             throw new UnauthorizedException('Invalid or expired refresh token');
         }
     }
+
+    // ─── Email Verification ──────────────────────────────────────────────────
+
+    async sendVerificationOtp(userId: number): Promise<{ message: string }> {
+        const user = await this.findOneWithPassword(userId);
+        if (user.isAccountVerified) {
+            throw new BadRequestException('Account is already verified');
+        }
+        await this.issueOtp(user, OtpType.EMAIL_VERIFICATION);
+        return { message: 'Verification OTP sent to your email' };
+    }
+
+    async verifyEmail(userId: number, code: string): Promise<{ message: string }> {
+        const user = await this.findOneWithPassword(userId);
+        if (user.isAccountVerified) {
+            throw new BadRequestException('Account is already verified');
+        }
+        await this.consumeOtp(userId, code, OtpType.EMAIL_VERIFICATION);
+        user.isAccountVerified = true;
+        await this.usersRepository.save(user);
+        return { message: 'Email verified successfully' };
+    }
+
+    // ─── Password Reset ──────────────────────────────────────────────────────
+
+    async sendPasswordResetOtp(email: string): Promise<{ message: string }> {
+        const successMsg = { message: 'If an account exists with this email, a reset OTP has been sent' };
+        const user = await this.usersRepository.findOneBy({ email });
+        if (!user) return successMsg;
+        await this.issueOtp(user, OtpType.PASSWORD_RESET);
+        return successMsg;
+    }
+
+    async resetPassword(email: string, code: string, newPassword: string): Promise<{ message: string }> {
+        const user = await this.usersRepository.findOneBy({ email });
+        if (!user) throw new BadRequestException('Invalid or expired OTP');
+
+        await this.consumeOtp(user.id, code, OtpType.PASSWORD_RESET);
+        user.password = await bcrypt.hash(newPassword, 10);
+        await this.usersRepository.save(user);
+        return { message: 'Password reset successfully' };
+    }
+
+    // ─── OTP helpers ─────────────────────────────────────────────────────────
+
+    private async issueOtp(user: User, type: OtpType): Promise<void> {
+        const latest = await this.otpRepository.findOne({
+            where: { userId: user.id, type },
+            order: { createdAt: 'DESC' },
+        });
+
+        if (latest) {
+            const elapsed = Date.now() - latest.createdAt.getTime();
+            if (elapsed < OTP_RATE_LIMIT_MS) {
+                const waitSec = Math.ceil((OTP_RATE_LIMIT_MS - elapsed) / 1000);
+                throw new BadRequestException(`Please wait ${waitSec} seconds before requesting a new OTP`);
+            }
+        }
+
+        // Invalidate all previous OTPs of this type for the user
+        await this.otpRepository.update(
+            { userId: user.id, type, isUsed: false },
+            { isUsed: true },
+        );
+
+        const code = Math.floor(100_000 + Math.random() * 900_000).toString();
+        const expiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
+        await this.otpRepository.save({ userId: user.id, code, type, expiresAt });
+
+        if (type === OtpType.EMAIL_VERIFICATION) {
+            await this.mailService.sendVerificationOtp(user.email, user.username, code);
+        } else {
+            await this.mailService.sendPasswordResetOtp(user.email, user.username, code);
+        }
+    }
+
+    private async consumeOtp(userId: number, code: string, type: OtpType): Promise<void> {
+        const otp = await this.otpRepository.findOne({
+            where: { userId, code, type, isUsed: false },
+        });
+
+        if (!otp || otp.expiresAt < new Date()) {
+            throw new BadRequestException('Invalid or expired OTP');
+        }
+
+        otp.isUsed = true;
+        await this.otpRepository.save(otp);
+    }
+
+    // ─── Token helpers ───────────────────────────────────────────────────────
 
     private generateAccessToken(payload: object): string {
         return this.jwtService.sign(payload, {
