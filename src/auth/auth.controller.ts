@@ -1,4 +1,5 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import type { Request, Response } from 'express';
 import { UsersService } from '../users/users.service';
 import { RegisterDto } from '../users/dtos/register.dto';
@@ -8,13 +9,14 @@ import { SendResetOtpDto } from '../users/dtos/send-reset-otp.dto';
 import { ResetPasswordDto } from '../users/dtos/reset-password.dto';
 import { JwtGuard } from './jwt.guard';
 import { CurrentUser } from './current-user.decorator';
+import type { User } from '../users/user.entity';
 
 const REFRESH_COOKIE = 'refresh_token';
 const COOKIE_OPTIONS = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict' as const,
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7d in ms
+    maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
 @Controller('auth')
@@ -48,6 +50,23 @@ export class AuthController {
     logout(@Res({ passthrough: true }) res: Response) {
         res.clearCookie(REFRESH_COOKIE);
         return { message: 'Logged out successfully' };
+    }
+
+    // ─── Google OAuth ────────────────────────────────────────────────────────
+
+    @Get('google')
+    @UseGuards(AuthGuard('google'))
+    googleLogin() {
+        // Passport redirects to Google — no body needed
+    }
+
+    @Get('google/callback')
+    @UseGuards(AuthGuard('google'))
+    googleCallback(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+        const user = req.user as User;
+        const { refreshToken, ...rest } = this.usersService.generateTokensForUser(user);
+        res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTIONS);
+        return rest;
     }
 
     // ─── Email Verification ──────────────────────────────────────────────────

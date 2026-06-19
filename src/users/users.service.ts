@@ -152,6 +152,42 @@ export class UsersService {
         }
     }
 
+    // ─── Google OAuth ────────────────────────────────────────────────────────
+
+    async findOrCreateGoogleUser(profile: { email: string; name: string }): Promise<User> {
+        let user = await this.usersRepository.findOneBy({ email: profile.email });
+
+        if (!user) {
+            let username = profile.name.replace(/\s+/g, '').toLowerCase().slice(0, 30);
+            const taken = await this.usersRepository.findOneBy({ username });
+            if (taken) username = username + Math.floor(Math.random() * 9_000 + 1_000);
+
+            const randomPassword = await bcrypt.hash(Math.random().toString(36), 10);
+            user = this.usersRepository.create({
+                email: profile.email,
+                username,
+                password: randomPassword,
+                isAccountVerified: true,
+            });
+            user = await this.usersRepository.save(user);
+        } else if (!user.isAccountVerified) {
+            user.isAccountVerified = true;
+            user = await this.usersRepository.save(user);
+        }
+
+        return user;
+    }
+
+    generateTokensForUser(user: User): { accessToken: string; refreshToken: string; user: Omit<User, 'password'> } {
+        const payload = { id: user.id, email: user.email, userType: user.userType };
+        const userWithoutPassword = (({ password: _p, ...rest }) => rest)(user);
+        return {
+            accessToken: this.generateAccessToken(payload),
+            refreshToken: this.generateRefreshToken(payload),
+            user: userWithoutPassword,
+        };
+    }
+
     // ─── Email Verification ──────────────────────────────────────────────────
 
     async sendVerificationOtp(userId: number): Promise<{ message: string }> {

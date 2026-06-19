@@ -5,6 +5,7 @@ A full-featured e-commerce REST API built with **NestJS**, **TypeORM**, and **Po
 ## Features
 
 - JWT authentication with refresh tokens (HTTP-only cookie)
+- Google OAuth 2.0 login (auto-creates account if new)
 - Email verification and password reset via OTP
 - Role-based access control (USER / ADMIN / SUPER_ADMIN)
 - Products with stock, images, categories, and avg rating
@@ -77,6 +78,33 @@ Authorization: Bearer <accessToken>
 ---
 
 ## Auth
+
+### Google OAuth
+
+#### Step 1 — Redirect user to Google
+```
+GET /auth/google
+```
+Open this URL in the browser. The user is redirected to Google's consent screen.
+
+#### Step 2 — Google calls back automatically
+```
+GET /auth/google/callback
+```
+Handled internally by the server. On success:
+- If the Google email **already exists** in the DB → logs the user in (and marks account as verified)
+- If the email is **new** → creates an account automatically (random password, `isAccountVerified: true`)
+
+**Response 200** — same shape as normal login:
+```json
+{
+  "accessToken": "eyJ...",
+  "user": { "id": 5, "username": "johndoe", "email": "john@gmail.com", "isAccountVerified": true }
+}
+```
+Refresh token is set as an HTTP-only cookie.
+
+---
 
 ### Register
 ```
