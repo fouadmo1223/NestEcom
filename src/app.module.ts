@@ -8,6 +8,8 @@ import { AuthModule } from './auth/auth.module';
 import { CategoriesModule } from './categories/categories.module';
 import { UploadModule } from './uploads/upload.module';
 import { MailModule } from './mail/mail.module';
+import { CartModule } from './cart/cart.module';
+import { WishlistModule } from './wishlist/wishlist.module';
 
 @Module({
    imports: [
@@ -33,6 +35,8 @@ import { MailModule } from './mail/mail.module';
       CategoriesModule,
       UploadModule,
       MailModule,
+      CartModule,
+      WishlistModule,
    ],
    controllers: [],
    providers: [
