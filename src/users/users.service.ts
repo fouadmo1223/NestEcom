@@ -67,7 +67,9 @@ export class UsersService {
 
         const hashedPassword = await bcrypt.hash(dto.password, 10);
         const user = this.usersRepository.create({ ...dto, password: hashedPassword });
-        return this.usersRepository.save(user);
+        const saved = await this.usersRepository.save(user);
+        await this.issueOtp(saved, OtpType.EMAIL_VERIFICATION);
+        return saved;
     }
 
     async login(dto: LoginDto): Promise<AuthResponse> {
