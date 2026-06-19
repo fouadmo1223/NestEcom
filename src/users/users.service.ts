@@ -62,13 +62,17 @@ export class UsersService {
     }
 
     async register(dto: RegisterDto): Promise<User> {
-        const existing = await this.usersRepository.findOneBy({ email: dto.email });
-        if (existing) throw new BadRequestException('Email already in use');
+        const existing = await this.usersRepository.findOne({
+            where: [{ email: dto.email }, { username: dto.username }],
+        });
+        if (existing?.email === dto.email) throw new BadRequestException('Email already in use');
+        if (existing?.username === dto.username) throw new BadRequestException('Username already in use');
 
         const hashedPassword = await bcrypt.hash(dto.password, 10);
         const user = this.usersRepository.create({ ...dto, password: hashedPassword });
         const saved = await this.usersRepository.save(user);
-        await this.issueOtp(saved, OtpType.EMAIL_VERIFICATION);
+        // Fire-and-forget: don't let mail failure break registration
+        this.issueOtp(saved, OtpType.EMAIL_VERIFICATION).catch(() => null);
         return saved;
     }
 
@@ -80,7 +84,7 @@ export class UsersService {
         if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
 
         const payload = { id: user.id, email: user.email, userType: user.userType };
-        const { password: _pw, ...userWithoutPassword } = user;
+        const userWithoutPassword = (({ password: _p, ...rest }) => rest)(user);
 
         return {
             accessToken: this.generateAccessToken(payload),
