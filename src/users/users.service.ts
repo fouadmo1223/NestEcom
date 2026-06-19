@@ -83,6 +83,8 @@ export class UsersService {
         const passwordMatch = await bcrypt.compare(dto.password, user.password);
         if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
 
+        if (!user.isAccountVerified) throw new UnauthorizedException('Please verify your email before logging in');
+
         const payload = { id: user.id, email: user.email, userType: user.userType };
         const userWithoutPassword = (({ password: _p, ...rest }) => rest)(user);
 
