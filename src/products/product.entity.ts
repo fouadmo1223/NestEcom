@@ -23,6 +23,9 @@ export class Product {
     @Column({ type: 'varchar', nullable: true })
     image!: string | null;
 
+    @Column({ type: 'int', default: 0 })
+    stock!: number;
+
     @ManyToOne(() => User, { onDelete: 'CASCADE', eager: true })
     createdBy!: User;
 
@@ -31,6 +34,12 @@ export class Product {
 
     @OneToMany(() => Review, (review) => review.product, { eager: true })
     reviews!: Review[];
+
+    get avgRating(): number {
+        if (!this.reviews?.length) return 0;
+        const sum = this.reviews.reduce((acc, r) => acc + r.rating, 0);
+        return Math.round((sum / this.reviews.length) * 10) / 10;
+    }
 
     @CreateDateColumn()
     createdAt!: Date;
