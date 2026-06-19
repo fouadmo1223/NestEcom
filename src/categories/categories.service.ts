@@ -33,15 +33,20 @@ export class CategoriesService {
         return category;
     }
 
-    create(dto: CreateCategoryDto, userId: number): Promise<Category> {
-        const category = this.categoriesRepository.create({ ...dto, createdBy: { id: userId } });
+    create(dto: CreateCategoryDto, userId: number, imageUrl?: string): Promise<Category> {
+        const category = this.categoriesRepository.create({
+            ...dto,
+            image: imageUrl ?? null,
+            createdBy: { id: userId },
+        });
         return this.categoriesRepository.save(category);
     }
 
-    async update(id: number, dto: UpdateCategoryDto, currentUser: CurrentUser): Promise<Category> {
+    async update(id: number, dto: UpdateCategoryDto, currentUser: CurrentUser, imageUrl?: string): Promise<Category> {
         const category = await this.findOne(id);
         this.checkOwnership(category, currentUser);
         Object.assign(category, dto);
+        if (imageUrl) category.image = imageUrl;
         return this.categoriesRepository.save(category);
     }
 

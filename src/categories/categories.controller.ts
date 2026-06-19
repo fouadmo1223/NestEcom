@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dtos/create-category.dto';
 import { UpdateCategoryDto } from './dtos/update-category.dto';
@@ -8,6 +9,7 @@ import { Roles } from '../auth/roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UserType } from '../users/user.entity';
 import { PaginationDto } from '../common/dtos/pagination.dto';
+import { imageMulterOptions } from '../uploads/multer.config';
 
 type CurrentUserPayload = { id: number; userType: UserType };
 
@@ -30,19 +32,28 @@ export class CategoriesController {
     @Post()
     @UseGuards(JwtGuard, RolesGuard)
     @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
-    create(@Body() dto: CreateCategoryDto, @CurrentUser() user: CurrentUserPayload) {
-        return this.categoriesService.create(dto, user.id);
+    @UseInterceptors(FileInterceptor('image', imageMulterOptions))
+    create(
+        @Body() dto: CreateCategoryDto,
+        @CurrentUser() user: CurrentUserPayload,
+        @UploadedFile() file?: Express.Multer.File,
+    ) {
+        const imageUrl = file ? `/uploads/files/${file.filename}` : undefined;
+        return this.categoriesService.create(dto, user.id, imageUrl);
     }
 
     @Patch(':id')
     @UseGuards(JwtGuard, RolesGuard)
     @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
+    @UseInterceptors(FileInterceptor('image', imageMulterOptions))
     update(
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: UpdateCategoryDto,
         @CurrentUser() user: CurrentUserPayload,
+        @UploadedFile() file?: Express.Multer.File,
     ) {
-        return this.categoriesService.update(id, dto, user);
+        const imageUrl = file ? `/uploads/files/${file.filename}` : undefined;
+        return this.categoriesService.update(id, dto, user, imageUrl);
     }
 
     @Delete(':id')
