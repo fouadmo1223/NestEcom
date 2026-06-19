@@ -5,7 +5,7 @@ import * as nodemailer from 'nodemailer';
 @Injectable()
 export class MailService {
   private transporter: nodemailer.Transporter;
-  private sender = '"My App" <no-reply@myapp.com>';
+  private sender = '"My App" <fm0850020@gmail.com>';
 
   constructor(private config: ConfigService) {
     this.transporter = nodemailer.createTransport({
