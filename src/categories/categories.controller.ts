@@ -3,6 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dtos/create-category.dto';
 import { UpdateCategoryDto } from './dtos/update-category.dto';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -15,7 +16,10 @@ type CurrentUserPayload = { id: number; userType: UserType };
 
 @Controller('categories')
 export class CategoriesController {
-    constructor(private readonly categoriesService: CategoriesService) {}
+    constructor(
+        private readonly categoriesService: CategoriesService,
+        private readonly cloudinaryService: CloudinaryService,
+    ) {}
 
     @Get()
     getAll(@Query() { page, limit }: PaginationDto) {
@@ -33,12 +37,12 @@ export class CategoriesController {
     @UseGuards(JwtGuard, RolesGuard)
     @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
     @UseInterceptors(FileInterceptor('image', imageMulterOptions))
-    create(
+    async create(
         @Body() dto: CreateCategoryDto,
         @CurrentUser() user: CurrentUserPayload,
         @UploadedFile() file?: Express.Multer.File,
     ) {
-        const imageUrl = file ? `/uploads/files/${file.filename}` : undefined;
+        const imageUrl = file ? await this.cloudinaryService.uploadFile(file.buffer, 'categories') : undefined;
         return this.categoriesService.create(dto, user.id, imageUrl);
     }
 
@@ -46,13 +50,13 @@ export class CategoriesController {
     @UseGuards(JwtGuard, RolesGuard)
     @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
     @UseInterceptors(FileInterceptor('image', imageMulterOptions))
-    update(
+    async update(
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: UpdateCategoryDto,
         @CurrentUser() user: CurrentUserPayload,
         @UploadedFile() file?: Express.Multer.File,
     ) {
-        const imageUrl = file ? `/uploads/files/${file.filename}` : undefined;
+        const imageUrl = file ? await this.cloudinaryService.uploadFile(file.buffer, 'categories') : undefined;
         return this.categoriesService.update(id, dto, user, imageUrl);
     }
 

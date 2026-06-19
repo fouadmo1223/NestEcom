@@ -2,6 +2,7 @@ import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatu
 import { FileInterceptor } from '@nestjs/platform-express';
 import { imageMulterOptions } from '../uploads/multer.config';
 import { UsersService } from './users.service';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -13,7 +14,10 @@ import { PaginationDto } from '../common/dtos/pagination.dto';
 
 @Controller('users')
 export class UsersController {
-    constructor(private readonly usersService: UsersService) {}
+    constructor(
+        private readonly usersService: UsersService,
+        private readonly cloudinaryService: CloudinaryService,
+    ) {}
 
     @Get()
     @Roles(UserType.SUPER_ADMIN)
@@ -47,12 +51,13 @@ export class UsersController {
     @Patch('me/profile-image')
     @UseGuards(JwtGuard)
     @UseInterceptors(FileInterceptor('image', imageMulterOptions))
-    uploadProfileImage(
+    async uploadProfileImage(
         @CurrentUser() user: { id: number },
         @UploadedFile() file: Express.Multer.File,
     ) {
         if (!file) throw new BadRequestException('No image uploaded');
-        return this.usersService.updateProfileImage(user.id, `/uploads/files/${file.filename}`);
+        const imageUrl = await this.cloudinaryService.uploadFile(file.buffer, 'profiles');
+        return this.usersService.updateProfileImage(user.id, imageUrl);
     }
 
     @Patch(':id/ban')

@@ -4,6 +4,7 @@ import { ProductsService } from './products.service';
 import { CreateProductDto } from './dtos/create-product.dto';
 import { UpdateProductDto } from './dtos/update-product.dto';
 import { ProductsQueryDto } from './dtos/products-query.dto';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { JwtGuard } from '../auth/jwt.guard';
 import { JwtOptionalGuard } from '../auth/jwt-optional.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -16,7 +17,10 @@ type CurrentUserPayload = { id: number; userType: UserType };
 
 @Controller('products')
 export class ProductsController {
-    constructor(private readonly productsService: ProductsService) {}
+    constructor(
+        private readonly productsService: ProductsService,
+        private readonly cloudinaryService: CloudinaryService,
+    ) {}
 
     @Get()
     @UseGuards(JwtOptionalGuard)
@@ -38,26 +42,28 @@ export class ProductsController {
     @UseGuards(JwtGuard, RolesGuard)
     @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
     @UseInterceptors(FileInterceptor('image', imageMulterOptions))
-    create(
+    async create(
         @Body() dto: CreateProductDto,
         @CurrentUser() user: CurrentUserPayload,
         @UploadedFile() file: Express.Multer.File,
     ) {
         if (!file) throw new BadRequestException('Product image is required');
-        return this.productsService.create(dto, user.id, `/uploads/files/${file.filename}`);
+        const imageUrl = await this.cloudinaryService.uploadFile(file.buffer, 'products');
+        return this.productsService.create(dto, user.id, imageUrl);
     }
 
     @Patch(':id')
     @UseGuards(JwtGuard, RolesGuard)
     @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
     @UseInterceptors(FileInterceptor('image', imageMulterOptions))
-    update(
+    async update(
         @Param('id', ParseIntPipe) id: number,
         @Body() dto: UpdateProductDto,
         @CurrentUser() user: CurrentUserPayload,
         @UploadedFile() file?: Express.Multer.File,
     ) {
-        return this.productsService.update(id, dto, user, file ? `/uploads/files/${file.filename}` : undefined);
+        const imageUrl = file ? await this.cloudinaryService.uploadFile(file.buffer, 'products') : undefined;
+        return this.productsService.update(id, dto, user, imageUrl);
     }
 
     @Delete(':id')

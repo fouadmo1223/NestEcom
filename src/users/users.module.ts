@@ -9,6 +9,7 @@ import { Otp } from './otp.entity';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { MailModule } from '../mail/mail.module';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 @Module({
     imports: [
@@ -23,6 +24,7 @@ import { MailModule } from '../mail/mail.module';
             }),
         }),
         MailModule,
+        CloudinaryModule,
     ],
     controllers: [UsersController],
     providers: [UsersService, JwtGuard, RolesGuard],
