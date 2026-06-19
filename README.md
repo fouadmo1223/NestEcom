@@ -240,10 +240,11 @@ GET /users?page=1&limit=10
 
 ## Products
 
-### List Products 🔒
+### List Products
 ```
 GET /products
 ```
+Public endpoint — no token required. If a valid token is provided, ADMIN users will only see their own products.
 
 | Query Param | Type | Description |
 |---|---|---|
