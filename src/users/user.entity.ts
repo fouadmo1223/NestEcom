@@ -29,6 +29,9 @@ export class User {
     @Column({ default: false })
     isAccountVerified!: boolean;
 
+    @Column({ default: false })
+    isBanned!: boolean;
+
     @Column({ type: 'varchar', nullable: true })
     profileImage!: string | null;
 

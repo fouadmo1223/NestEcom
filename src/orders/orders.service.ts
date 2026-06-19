@@ -158,6 +158,23 @@ export class OrdersService {
         return { data, pagination: { total, page: p, limit: l, totalPages: Math.ceil(total / l) } };
     }
 
+    async cancelOrder(id: number, userId: number): Promise<Order> {
+        const order = await this.orderRepo.findOne({ where: { id } });
+        if (!order) throw new NotFoundException('Order not found');
+        if (order.user.id !== userId) throw new ForbiddenException('Access denied');
+        if (order.status !== OrderStatus.PENDING) {
+            throw new BadRequestException('Only pending orders can be cancelled');
+        }
+
+        // Restore stock for each item
+        for (const item of order.items) {
+            await this.productRepo.increment({ id: item.productId }, 'stock', item.quantity);
+        }
+
+        order.status = OrderStatus.CANCELLED;
+        return this.orderRepo.save(order);
+    }
+
     async updateStatus(id: number, dto: UpdateOrderStatusDto, userEmail: string): Promise<Order> {
         const order = await this.orderRepo.findOne({ where: { id } });
         if (!order) throw new NotFoundException('Order not found');

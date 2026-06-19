@@ -84,6 +84,7 @@ export class UsersService {
         if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
 
         if (!user.isAccountVerified) throw new UnauthorizedException('Please verify your email before logging in');
+        if (user.isBanned) throw new UnauthorizedException('Your account has been banned. Contact support.');
 
         const payload = { id: user.id, email: user.email, userType: user.userType };
         const userWithoutPassword = (({ password: _p, ...rest }) => rest)(user);
@@ -150,6 +151,41 @@ export class UsersService {
         } catch {
             throw new UnauthorizedException('Invalid or expired refresh token');
         }
+    }
+
+    // ─── Password & Account ──────────────────────────────────────────────────
+
+    async changePassword(userId: number, currentPassword: string, newPassword: string): Promise<{ message: string }> {
+        const user = await this.findOneWithPassword(userId);
+        const match = await bcrypt.compare(currentPassword, user.password);
+        if (!match) throw new BadRequestException('Current password is incorrect');
+        user.password = await bcrypt.hash(newPassword, 10);
+        await this.usersRepository.save(user);
+        return { message: 'Password changed successfully' };
+    }
+
+    async deleteMyAccount(userId: number): Promise<{ message: string }> {
+        const user = await this.findOneWithPassword(userId);
+        await this.usersRepository.remove(user);
+        return { message: 'Account deleted successfully' };
+    }
+
+    // ─── Ban / Unban ─────────────────────────────────────────────────────────
+
+    async banUser(id: number): Promise<{ message: string }> {
+        const user = await this.findOneWithPassword(id);
+        if (user.isBanned) throw new BadRequestException('User is already banned');
+        user.isBanned = true;
+        await this.usersRepository.save(user);
+        return { message: `User "${user.username}" has been banned` };
+    }
+
+    async unbanUser(id: number): Promise<{ message: string }> {
+        const user = await this.findOneWithPassword(id);
+        if (!user.isBanned) throw new BadRequestException('User is not banned');
+        user.isBanned = false;
+        await this.usersRepository.save(user);
+        return { message: `User "${user.username}" has been unbanned` };
     }
 
     // ─── Google OAuth ────────────────────────────────────────────────────────

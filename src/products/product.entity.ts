@@ -26,6 +26,9 @@ export class Product {
     @Column({ type: 'int', default: 0 })
     stock!: number;
 
+    @Column('simple-array', { nullable: true })
+    tags!: string[] | null;
+
     @ManyToOne(() => User, { onDelete: 'CASCADE', eager: true })
     createdBy!: User;
 

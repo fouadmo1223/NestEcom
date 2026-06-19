@@ -29,6 +29,11 @@ export class ProductsController {
         return this.productsService.findOne(id);
     }
 
+    @Get(':id/related')
+    getRelated(@Param('id', ParseIntPipe) id: number) {
+        return this.productsService.findRelated(id);
+    }
+
     @Post()
     @UseGuards(JwtGuard, RolesGuard)
     @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)

@@ -29,4 +29,8 @@ export class ProductsQueryDto extends PaginationDto {
     @IsOptional()
     @IsIn(['ASC', 'DESC'])
     sortOrder?: 'ASC' | 'DESC';
+
+    @IsOptional()
+    @IsIn(['new', 'sale', 'featured'])
+    tag?: 'new' | 'sale' | 'featured';
 }

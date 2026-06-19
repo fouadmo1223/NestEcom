@@ -38,6 +38,11 @@ export class OrdersController {
         return this.ordersService.findAll(pagination);
     }
 
+    @Patch(':id/cancel')
+    cancelOrder(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: CurrentUserPayload) {
+        return this.ordersService.cancelOrder(id, user.id);
+    }
+
     @Patch(':id/status')
     @UseGuards(RolesGuard)
     @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)

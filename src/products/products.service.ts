@@ -54,6 +54,9 @@ export class ProductsService {
         if (query.maxPrice) {
             qb.andWhere('product.price <= :maxPrice', { maxPrice: Number(query.maxPrice) });
         }
+        if (query.tag) {
+            qb.andWhere('product.tags LIKE :tag', { tag: `%${query.tag}%` });
+        }
 
         const sortOrder = query.sortOrder ?? 'DESC';
         if (query.sortBy === 'price') {
@@ -109,6 +112,30 @@ export class ProductsService {
         const product = await this.findOne(id);
         this.checkOwnership(product, currentUser);
         return this.productsRepository.remove(product);
+    }
+
+    async findRelated(id: number, limit = 6): Promise<(Product & { avgRating: number })[]> {
+        const product = await this.findOne(id);
+        const categoryId = product.category?.id;
+
+        const qb = this.productsRepository.createQueryBuilder('product')
+            .leftJoinAndSelect('product.createdBy', 'createdBy')
+            .leftJoinAndSelect('product.category', 'category')
+            .leftJoinAndSelect('product.reviews', 'reviews')
+            .addSelect(AVG_RATING_SUBQUERY, 'avgRating')
+            .where('product.id != :id', { id })
+            .orderBy(AVG_RATING_SUBQUERY, 'DESC')
+            .take(limit);
+
+        if (categoryId) {
+            qb.andWhere('category.id = :categoryId', { categoryId });
+        }
+
+        const { entities, raw } = await qb.getRawAndEntities();
+        return entities.map((entity, i) => ({
+            ...entity,
+            avgRating: parseFloat(raw[i]?.avgRating ?? '0'),
+        }));
     }
 
     async decrementStock(productId: number, quantity: number): Promise<void> {
