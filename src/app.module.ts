@@ -13,6 +13,7 @@ import { WishlistModule } from './wishlist/wishlist.module';
 import { AddressesModule } from './addresses/addresses.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { OrdersModule } from './orders/orders.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
    imports: [
@@ -43,6 +44,7 @@ import { OrdersModule } from './orders/orders.module';
       AddressesModule,
       CouponsModule,
       OrdersModule,
+      AnalyticsModule,
    ],
    controllers: [],
    providers: [

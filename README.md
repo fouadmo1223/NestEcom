@@ -8,14 +8,18 @@ A full-featured e-commerce REST API built with **NestJS**, **TypeORM**, and **Po
 - Google OAuth 2.0 login (auto-creates account if new)
 - Email verification and password reset via OTP
 - Role-based access control (USER / ADMIN / SUPER_ADMIN)
-- Products with stock, images, categories, and avg rating
-- Full-text search and sort by price / rating / newest
+- Products with stock, images, categories, avg rating, and tags (new/sale/featured)
+- Full-text search, filter by tag, and sort by price / rating / newest
+- Related products per product
 - Cart and Wishlist
 - Orders & Checkout with stock validation
+- User can cancel their own pending order (stock is restored)
 - Coupon / discount codes (percentage or fixed)
 - User shipping addresses
 - Transactional emails (OTP, order confirmed, order shipped)
 - File uploads (product images, category images, profile images)
+- Admin: ban / unban users
+- Admin Analytics dashboard (revenue, best-selling products, orders by status, user growth)
 
 ---
 
@@ -216,6 +220,27 @@ GET /users/me
 
 ---
 
+### Change Password 🔒
+```
+PATCH /users/me/password
+```
+```json
+{ "currentPassword": "oldSecret", "newPassword": "newSecret123" }
+```
+**Response 200** `{ "message": "Password changed successfully" }`
+
+---
+
+### Delete My Account 🔒
+```
+DELETE /users/me
+```
+Permanently deletes the currently logged-in account and all its data.
+
+**Response 200** `{ "message": "Account deleted successfully" }`
+
+---
+
 ### Upload Profile Image 🔒
 ```
 PATCH /users/me/profile-image
@@ -223,6 +248,24 @@ PATCH /users/me/profile-image
 `multipart/form-data` with field `image` (jpg/jpeg/png/gif/webp, max 5MB).
 
 **Response 200** — updated user object.
+
+---
+
+### Ban User 🔒 `ADMIN / SUPER_ADMIN`
+```
+PATCH /users/:id/ban
+```
+Prevents the user from logging in.
+
+**Response 200** `{ "message": "User \"john\" has been banned" }`
+
+---
+
+### Unban User 🔒 `ADMIN / SUPER_ADMIN`
+```
+PATCH /users/:id/unban
+```
+**Response 200** `{ "message": "User \"john\" has been unbanned" }`
 
 ---
 
@@ -282,6 +325,7 @@ Public endpoint — no token required. If a valid token is provided, ADMIN users
 | `maxPrice` | number | Maximum price |
 | `sortBy` | `price` \| `createdAt` \| `avgRating` | Sort field (default: `createdAt`) |
 | `sortOrder` | `ASC` \| `DESC` | Sort direction (default: `DESC`) |
+| `tag` | `new` \| `sale` \| `featured` | Filter by tag |
 | `page` | number | Page number (default: 1) |
 | `limit` | number | Items per page (default: 10, max: 100) |
 
@@ -314,6 +358,16 @@ Returns product with all reviews and `avgRating`.
 
 ---
 
+### Get Related Products
+```
+GET /products/:id/related
+```
+Returns up to 6 products from the same category, ordered by rating. Falls back to any products if the product has no category.
+
+**Response 200** — array of product objects, each with `avgRating`.
+
+---
+
 ### Create Product 🔒 `ADMIN / SUPER_ADMIN`
 ```
 POST /products
@@ -328,6 +382,9 @@ POST /products
 | `description` | string | No |
 | `categoryId` | number | No |
 | `stock` | number | No (default: 0) |
+| `tags` | comma-separated string | No — values: `new`, `sale`, `featured` |
+
+Example tags value: `new,sale`
 
 ---
 
@@ -690,6 +747,16 @@ Owner, ADMIN, or SUPER_ADMIN only.
 GET /orders?page=1&limit=10
 ```
 
+### Cancel Order 🔒
+```
+PATCH /orders/:id/cancel
+```
+Can only be called by the order's owner, and only when the order status is `pending`. Stock is automatically restored.
+
+**Response 200** — updated order object with `status: "cancelled"`
+
+---
+
 ### Update Order Status 🔒 `ADMIN / SUPER_ADMIN`
 ```
 PATCH /orders/:id/status
@@ -705,6 +772,85 @@ PATCH /orders/:id/status
 **Status values:** `pending` → `confirmed` → `processing` → `shipped` → `delivered` | `cancelled`
 
 > Changing status to `shipped` automatically sends a shipping notification email to the customer.
+
+---
+
+## Analytics 🔒 `ADMIN / SUPER_ADMIN`
+
+All analytics endpoints require an ADMIN or SUPER_ADMIN token.
+
+### Revenue by Date Range
+```
+GET /analytics/revenue?startDate=2026-01-01&endDate=2026-06-30
+```
+Both query params are optional (omit to get all-time).
+
+**Response 200**
+```json
+{
+  "totalRevenue": 4820.50,
+  "totalOrders": 63,
+  "byDay": [
+    { "date": "2026-06-01T00:00:00.000Z", "revenue": 320.00, "orders": 4 },
+    { "date": "2026-06-02T00:00:00.000Z", "revenue": 150.75, "orders": 2 }
+  ]
+}
+```
+Cancelled orders are excluded.
+
+---
+
+### Best-Selling Products
+```
+GET /analytics/best-selling?limit=10
+```
+`limit` is optional (default: 10).
+
+**Response 200**
+```json
+[
+  { "productId": 3, "productTitle": "Wireless Headphones", "totalSold": 42, "totalRevenue": 2099.58 },
+  { "productId": 7, "productTitle": "USB-C Hub", "totalSold": 35, "totalRevenue": 874.65 }
+]
+```
+
+---
+
+### Orders by Status
+```
+GET /analytics/orders
+```
+**Response 200**
+```json
+{
+  "pending": 12,
+  "confirmed": 5,
+  "processing": 3,
+  "shipped": 8,
+  "delivered": 30,
+  "cancelled": 4
+}
+```
+
+---
+
+### User Growth
+```
+GET /analytics/users?startDate=2026-01-01&endDate=2026-06-30
+```
+Both query params are optional.
+
+**Response 200**
+```json
+{
+  "totalUsers": 254,
+  "newUsersInRange": 38,
+  "byDay": [
+    { "date": "2026-06-01T00:00:00.000Z", "newUsers": 5 },
+    { "date": "2026-06-02T00:00:00.000Z", "newUsers": 2 }
+  ]
+}
+```
 
 ---
 
