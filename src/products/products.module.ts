@@ -4,11 +4,12 @@ import { ProductsController } from './products.controller';
 import { ProductsService } from './products.service';
 import { Product } from './product.entity';
 import { AuthModule } from '../auth/auth.module';
+import { JwtOptionalGuard } from '../auth/jwt-optional.guard';
 
 @Module({
     imports: [TypeOrmModule.forFeature([Product]), AuthModule],
     controllers: [ProductsController],
-    providers: [ProductsService],
+    providers: [ProductsService, JwtOptionalGuard],
     exports: [ProductsService, TypeOrmModule],
 })
 export class ProductsModule {}

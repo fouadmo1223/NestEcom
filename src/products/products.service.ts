@@ -23,7 +23,7 @@ export class ProductsService {
         private readonly productsRepository: Repository<Product>,
     ) {}
 
-    async findAll(currentUser: CurrentUser, query: ProductsQueryDto) {
+    async findAll(currentUser: CurrentUser | null, query: ProductsQueryDto) {
         const page  = Math.max(1, Number(query.page)  || 1);
         const limit = Math.min(100, Math.max(1, Number(query.limit) || 10));
 
@@ -33,7 +33,7 @@ export class ProductsService {
             .leftJoinAndSelect('product.reviews', 'reviews')
             .addSelect(AVG_RATING_SUBQUERY, 'avgRating');
 
-        if (currentUser.userType === UserType.ADMIN) {
+        if (currentUser?.userType === UserType.ADMIN) {
             qb.andWhere('createdBy.id = :userId', { userId: currentUser.id });
         }
 

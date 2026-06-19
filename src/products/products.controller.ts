@@ -5,6 +5,7 @@ import { CreateProductDto } from './dtos/create-product.dto';
 import { UpdateProductDto } from './dtos/update-product.dto';
 import { ProductsQueryDto } from './dtos/products-query.dto';
 import { JwtGuard } from '../auth/jwt.guard';
+import { JwtOptionalGuard } from '../auth/jwt-optional.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -18,9 +19,9 @@ export class ProductsController {
     constructor(private readonly productsService: ProductsService) {}
 
     @Get()
-    @UseGuards(JwtGuard)
-    getAll(@CurrentUser() user: CurrentUserPayload, @Query() query: ProductsQueryDto) {
-        return this.productsService.findAll(user, query);
+    @UseGuards(JwtOptionalGuard)
+    getAll(@CurrentUser() user: CurrentUserPayload | undefined, @Query() query: ProductsQueryDto) {
+        return this.productsService.findAll(user ?? null, query);
     }
 
     @Get(':id')
