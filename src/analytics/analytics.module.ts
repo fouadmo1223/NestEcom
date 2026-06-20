@@ -5,9 +5,10 @@ import { OrderItem } from '../orders/order-item.entity';
 import { User } from '../users/user.entity';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsController } from './analytics.controller';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([Order, OrderItem, User])],
+    imports: [TypeOrmModule.forFeature([Order, OrderItem, User]),JwtModule],
     controllers: [AnalyticsController],
     providers: [AnalyticsService],
 })
