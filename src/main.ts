@@ -6,6 +6,7 @@ import { join } from 'path';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { LoggerInterceptor } from './utils/interceptors/logger.interceptor';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -26,6 +27,17 @@ async function bootstrap() {
         }),
     }),
   );
+  app.enableCors();
+
+  const config = new DocumentBuilder()
+    .setTitle('My App API')
+    .setDescription('E-commerce platform API documentation')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document);
+
   await app.listen(process.env.PORT ?? 3001);
 }
 bootstrap();
