@@ -28,7 +28,6 @@ export class ProductsController {
     @Get()
     @UseGuards(JwtOptionalGuard)
     @ApiOperation({ summary: 'Get all products', description: 'Retrieves all products with optional filtering, sorting, and pagination.' })
-    @ApiQuery({ type: ProductsQueryDto })
     @ApiResponse({ status: 200, description: 'Returns a list of products.', type: [Product] })
     getAll(@CurrentUser() user: CurrentUserPayload | undefined, @Query() query: ProductsQueryDto) {
         return this.productsService.findAll(user ?? null, query);
