@@ -14,7 +14,7 @@ async function bootstrap() {
   app.useStaticAssets(join(__dirname, '..', 'src/uploads/files'), { prefix: '/uploads/files' });
   app.use(cookieParser());
   app.use(new LoggerMiddleware().use);
-  app.useGlobalInterceptors(new LoggerInterceptor(), new ClassSerializerInterceptor(app.get(Reflector)));
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
