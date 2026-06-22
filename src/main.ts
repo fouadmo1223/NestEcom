@@ -6,12 +6,14 @@ import { join } from 'path';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { LoggerInterceptor } from './utils/interceptors/logger.interceptor';
+import { LoggerMiddleware } from './utils/middleware/logger.middleware';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.useStaticAssets(join(__dirname, '..', 'src/uploads/files'), { prefix: '/uploads/files' });
   app.use(cookieParser());
+  app.use(new LoggerMiddleware().use);
   app.useGlobalInterceptors(new LoggerInterceptor(), new ClassSerializerInterceptor(app.get(Reflector)));
   app.useGlobalPipes(
     new ValidationPipe({
