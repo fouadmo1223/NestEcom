@@ -1,5 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProductsModule } from './products/products.module';
@@ -16,6 +16,7 @@ import { CouponsModule } from './coupons/coupons.module';
 import { OrdersModule } from './orders/orders.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { LoggerMiddleware } from './utils/middleware/logger.middleware';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
    imports: [
@@ -59,7 +60,10 @@ import { LoggerMiddleware } from './utils/middleware/logger.middleware';
    ],
    controllers: [],
    providers: [
-      
+      {
+         provide: APP_GUARD,
+         useClass: ThrottlerGuard,
+      }
    ],
 })
 export class AppModule implements NestModule {
