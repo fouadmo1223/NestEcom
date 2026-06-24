@@ -1,4 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProductsModule } from './products/products.module';
@@ -47,6 +48,14 @@ import { LoggerMiddleware } from './utils/middleware/logger.middleware';
       CouponsModule,
       OrdersModule,
       AnalyticsModule,
+      ThrottlerModule.forRoot({
+         throttlers: [
+            {
+               ttl: 60000,
+               limit: 10,
+            },
+         ],
+      }),
    ],
    controllers: [],
    providers: [
