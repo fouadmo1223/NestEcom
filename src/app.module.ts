@@ -33,6 +33,7 @@ import { LoggerMiddleware } from './utils/middleware/logger.middleware';
             synchronize: config.get<string>('NODE_ENV') !== 'production',
          }),
       }),
+      
       ProductsModule,
       ReviewsModule,
       UsersModule,

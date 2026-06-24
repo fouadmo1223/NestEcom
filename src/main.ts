@@ -8,12 +8,14 @@ import { AppModule } from './app.module';
 import { LoggerInterceptor } from './utils/interceptors/logger.interceptor';
 import { LoggerMiddleware } from './utils/middleware/logger.middleware';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.useStaticAssets(join(__dirname, '..', 'src/uploads/files'), { prefix: '/uploads/files' });
   app.use(cookieParser());
   app.use(new LoggerMiddleware().use);
+  app.use(helmet())
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
   app.useGlobalPipes(
     new ValidationPipe({
