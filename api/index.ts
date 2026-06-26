@@ -17,7 +17,7 @@ async function bootstrapServer() {
     new ExpressAdapter(server),
   );
 
-  await configureApp(app);
+  configureApp(app);
   await app.init();
 
   return server;

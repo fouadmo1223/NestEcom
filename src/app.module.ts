@@ -17,6 +17,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { LoggerMiddleware } from './utils/middleware/logger.middleware';
 import { APP_GUARD } from '@nestjs/core';
 import { DatabaseModule } from './db/database.module';
+import { AppController } from './app.controller';
 
 @Module({
   imports: [
@@ -45,7 +46,7 @@ import { DatabaseModule } from './db/database.module';
       ],
     }),
   ],
-  controllers: [],
+  controllers: [AppController],
   providers: [
     {
       provide: APP_GUARD,
