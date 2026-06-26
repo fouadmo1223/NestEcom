@@ -21,12 +21,12 @@ async function seed() {
         'TRUNCATE TABLE reviews, products, categories, users RESTART IDENTITY CASCADE',
     );
 
-    const password = await bcrypt.hash('12345678', 10);
+    const password = await bcrypt.hash('11345678', 10);
 
     // Super admin
     const superAdmin = usersRepo.create({
-        username: 'superadmin',
-        email: 'superadmin@example.com',
+        username: 'Fouad Mohamed',
+        email: 'fouad2000@example.com',
         password,
         userType: UserType.SUPER_ADMIN,
         isAccountVerified: true,
@@ -37,8 +37,8 @@ async function seed() {
     const admins: User[] = [];
     for (let i = 1; i <= 5; i++) {
         const admin = usersRepo.create({
-            username: `admin${i}`,
-            email: `admin${i}@example.com`,
+            username: `2admin${i}`,
+            email: `2admin${i}@example.com`,
             password,
             userType: UserType.ADMIN,
             isAccountVerified: true,
