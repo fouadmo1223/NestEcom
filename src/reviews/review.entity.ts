@@ -1,33 +1,63 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Index,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { Product } from '../products/product.entity';
 import { User } from '../users/user.entity';
 
+export enum ReviewStatus {
+  PUBLISHED = 'published',
+  HIDDEN = 'hidden',
+}
+
 @Entity({ name: 'reviews' })
+@Index(['user', 'product'], { unique: true })
+@Index(['product', 'status'])
 export class Review {
-    @ApiProperty({ example: 1, description: 'The unique identifier of the review' })
-    @PrimaryGeneratedColumn()
-    id!: number;
+  @ApiProperty({ example: 1 })
+  @PrimaryGeneratedColumn()
+  id!: number;
 
-    @ApiProperty({ example: 5, description: 'The rating given by the user (1-5)' })
-    @Column({ type: 'int' })
-    rating!: number;
+  @ApiProperty({ example: 5 })
+  @Column({ type: 'int' })
+  rating!: number;
 
-    @ApiProperty({ example: 'This product is amazing!', description: 'A comment about the product', nullable: true })
-    @Column({ type: 'varchar', nullable: true })
-    comment!: string | null;
+  @ApiProperty({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
+  comment!: string | null;
 
-    @ManyToOne(() => Product, (product) => product.reviews, { onDelete: 'CASCADE' })
-    product!: Product;
+  @ApiProperty({ description: 'The reviewer bought and received this product' })
+  @Column({ default: false })
+  isVerifiedPurchase!: boolean;
 
-    @ManyToOne(() => User, (user) => user.reviews, { onDelete: 'CASCADE' })
-    user!: User;
+  @ApiProperty({ enum: ReviewStatus })
+  @Column({ type: 'enum', enum: ReviewStatus, default: ReviewStatus.PUBLISHED })
+  status!: ReviewStatus;
 
-    @ApiProperty({ description: 'The date and time the review was created' })
-    @CreateDateColumn()
-    createdAt!: Date;
+  @ApiProperty({ nullable: true })
+  @Column({ type: 'varchar', length: 1000, nullable: true })
+  vendorReply!: string | null;
 
-    @ApiProperty({ description: 'The date and time the review was last updated' })
-    @UpdateDateColumn()
-    updatedAt!: Date;
+  @Column({ type: 'timestamp', nullable: true })
+  vendorRepliedAt!: Date | null;
+
+  @ManyToOne(() => Product, (product) => product.reviews, { onDelete: 'CASCADE' })
+  product!: Product;
+
+  @ManyToOne(() => User, (user) => user.reviews, { onDelete: 'CASCADE' })
+  user!: User;
+
+  @ApiProperty()
+  @CreateDateColumn()
+  createdAt!: Date;
+
+  @ApiProperty()
+  @UpdateDateColumn()
+  updatedAt!: Date;
 }

@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags }
 import { ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dtos/create-review.dto';
 import { UpdateReviewDto } from './dtos/update-review.dto';
+import { ReplyReviewDto } from './dtos/moderation.dtos';
 import { JwtGuard } from '../auth/jwt.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UserType } from '../users/user.entity';
@@ -53,6 +54,18 @@ export class ReviewsController {
     @ApiResponse({ status: 404, description: 'Product not found.' })
     create(@Body() dto: CreateReviewDto, @CurrentUser() user: CurrentUserPayload) {
         return this.reviewsService.create(dto, user.id);
+    }
+
+    @Patch(':id/reply')
+    @ApiBearerAuth()
+    @UseGuards(JwtGuard)
+    @ApiOperation({ summary: 'Vendor reply to a review on their product' })
+    reply(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: ReplyReviewDto,
+        @CurrentUser() user: CurrentUserPayload,
+    ) {
+        return this.reviewsService.reply(id, user.id, dto.text);
     }
 
     @Patch(':id')

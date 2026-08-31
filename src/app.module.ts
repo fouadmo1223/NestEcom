@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ConfigModule } from '@nestjs/config';
 import { ProductsModule } from './products/products.module';
 import { ReviewsModule } from './reviews/reviews.module';
@@ -14,6 +15,11 @@ import { AddressesModule } from './addresses/addresses.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { OrdersModule } from './orders/orders.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { VendorsModule } from './vendors/vendors.module';
+import { MoneyModule } from './money/money.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { PlatformModule } from './platform/platform.module';
+import { AuditModule } from './common/audit/audit.module';
 import { LoggerMiddleware } from './utils/middleware/logger.middleware';
 import { APP_GUARD } from '@nestjs/core';
 import { DatabaseModule } from './db/database.module';
@@ -22,7 +28,11 @@ import { AppController } from './app.controller';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    EventEmitterModule.forRoot(),
     DatabaseModule,
+    AuditModule,
+    PlatformModule,
+    NotificationsModule,
 
     ProductsModule,
     ReviewsModule,
@@ -37,11 +47,15 @@ import { AppController } from './app.controller';
     CouponsModule,
     OrdersModule,
     AnalyticsModule,
+    VendorsModule,
+    MoneyModule,
     ThrottlerModule.forRoot({
       throttlers: [
         {
-          ttl: 60000,
-          limit: 10,
+          // Global ceiling for normal browsing traffic. Sensitive auth routes
+          // apply a tighter per-route @Throttle (see AuthController).
+          ttl: 60_000,
+          limit: 300,
         },
       ],
     }),

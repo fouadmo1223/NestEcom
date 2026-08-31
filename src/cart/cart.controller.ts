@@ -3,6 +3,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam, ApiBody } 
 import { CartService } from './cart.service';
 import { AddToCartDto } from './dtos/add-to-cart.dto';
 import { UpdateCartItemDto } from './dtos/update-cart-item.dto';
+import { MergeCartDto } from './dtos/merge-cart.dto';
 import { JwtGuard } from '../auth/jwt.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { CartItem } from './cart-item.entity';
@@ -27,6 +28,14 @@ export class CartController {
     @ApiResponse({ status: 201, description: 'Item added successfully.', type: CartItem })
     addItem(@CurrentUser() user: { id: number }, @Body() dto: AddToCartDto) {
         return this.cartService.addItem(user.id, dto);
+    }
+
+    @Post('merge')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Merge a guest cart', description: 'Folds a client-side cart into the server cart on login.' })
+    @ApiBody({ type: MergeCartDto })
+    merge(@CurrentUser() user: { id: number }, @Body() dto: MergeCartDto) {
+        return this.cartService.merge(user.id, dto);
     }
 
     @Patch('items/:id')

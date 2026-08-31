@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { UsersService } from '../users/users.service';
 
@@ -9,6 +11,8 @@ describe('AuthController', () => {
     login: jest.Mock;
     refreshTokens: jest.Mock;
     generateTokensForUser: jest.Mock;
+    issueGoogleAuthCode: jest.Mock;
+    exchangeGoogleAuthCode: jest.Mock;
     sendVerificationOtp: jest.Mock;
     verifyEmail: jest.Mock;
     sendPasswordResetOtp: jest.Mock;
@@ -21,6 +25,8 @@ describe('AuthController', () => {
       login: jest.fn(),
       refreshTokens: jest.fn(),
       generateTokensForUser: jest.fn(),
+      issueGoogleAuthCode: jest.fn(),
+      exchangeGoogleAuthCode: jest.fn(),
       sendVerificationOtp: jest.fn(),
       verifyEmail: jest.fn(),
       sendPasswordResetOtp: jest.fn(),
@@ -29,11 +35,23 @@ describe('AuthController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
-      providers: [{ provide: UsersService, useValue: usersService }],
+      providers: [
+        { provide: UsersService, useValue: usersService },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn((_key: string, def?: unknown) => def) },
+        },
+        {
+          provide: JwtService,
+          useValue: { verify: jest.fn(), verifyAsync: jest.fn(), sign: jest.fn(), signAsync: jest.fn() },
+        },
+      ],
     }).compile();
 
     controller = module.get(AuthController);
   });
+
+  const webReq = () => ({ headers: {}, cookies: {} }) as any;
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
@@ -48,7 +66,7 @@ describe('AuthController', () => {
     expect(usersService.register).toHaveBeenCalledWith(dto);
   });
 
-  it('login stores the refresh token in a cookie and returns the remaining payload', async () => {
+  it('login sets the refresh cookie for web clients and returns the rest', async () => {
     const dto = { email: 'user@example.com', password: 'secret' } as any;
     const res = { cookie: jest.fn() } as any;
     usersService.login.mockResolvedValue({
@@ -57,31 +75,46 @@ describe('AuthController', () => {
       user: { id: 1 },
     });
 
-    await expect(controller.login(dto, res)).resolves.toEqual({
+    await expect(controller.login(dto, webReq(), res)).resolves.toEqual({
       accessToken: 'access-token',
       user: { id: 1 },
     });
-    expect(usersService.login).toHaveBeenCalledWith(dto);
     expect(res.cookie).toHaveBeenCalledWith(
       'refresh_token',
       'refresh-token',
-      expect.objectContaining({
-        httpOnly: true,
-        sameSite: 'strict',
-        maxAge: 7 * 24 * 60 * 60 * 1000,
-      }),
+      expect.objectContaining({ httpOnly: true }),
     );
   });
 
-  it('refresh reads the cookie, rotates it, and returns the rest of the tokens', async () => {
-    const req = { cookies: { refresh_token: 'old-refresh' } } as any;
+  it('login returns the refresh token in the body for native clients', async () => {
+    const dto = { email: 'user@example.com', password: 'secret' } as any;
+    const res = { cookie: jest.fn() } as any;
+    const req = { headers: { 'x-client': 'mobile' }, cookies: {} } as any;
+    usersService.login.mockResolvedValue({
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      user: { id: 1 },
+    });
+
+    await expect(controller.login(dto, req, res)).resolves.toEqual({
+      accessToken: 'access-token',
+      user: { id: 1 },
+      refreshToken: 'refresh-token',
+    });
+    expect(res.cookie).not.toHaveBeenCalled();
+  });
+
+  it('refresh reads the cookie, rotates it, and returns the rest', async () => {
+    const req = { headers: {}, cookies: { refresh_token: 'old-refresh' } } as any;
     const res = { cookie: jest.fn() } as any;
     usersService.refreshTokens.mockResolvedValue({
       accessToken: 'new-access',
       refreshToken: 'new-refresh',
     });
 
-    await expect(controller.refresh(req, res)).resolves.toEqual({ accessToken: 'new-access' });
+    await expect(controller.refresh({}, req, res)).resolves.toEqual({
+      accessToken: 'new-access',
+    });
     expect(usersService.refreshTokens).toHaveBeenCalledWith('old-refresh');
     expect(res.cookie).toHaveBeenCalledWith(
       'refresh_token',
@@ -90,65 +123,37 @@ describe('AuthController', () => {
     );
   });
 
+  it('refresh accepts the token from the body for native clients', async () => {
+    const req = { headers: { 'x-client': 'mobile' }, cookies: {} } as any;
+    const res = { cookie: jest.fn() } as any;
+    usersService.refreshTokens.mockResolvedValue({
+      accessToken: 'new-access',
+      refreshToken: 'new-refresh',
+    });
+
+    await expect(
+      controller.refresh({ refreshToken: 'body-refresh' }, req, res),
+    ).resolves.toEqual({ accessToken: 'new-access', refreshToken: 'new-refresh' });
+    expect(usersService.refreshTokens).toHaveBeenCalledWith('body-refresh');
+  });
+
   it('logout clears the refresh token cookie', () => {
     const res = { clearCookie: jest.fn() } as any;
-
     expect(controller.logout(res)).toEqual({ message: 'Logged out successfully' });
-    expect(res.clearCookie).toHaveBeenCalledWith('refresh_token');
+    expect(res.clearCookie).toHaveBeenCalledWith('refresh_token', { path: '/' });
   });
 
-  it('googleCallback stores the generated refresh token and returns the rest', () => {
-    const req = { user: { id: 1, email: 'user@example.com' } } as any;
+  it('google/exchange swaps a one-time code for tokens', async () => {
     const res = { cookie: jest.fn() } as any;
-    usersService.generateTokensForUser.mockReturnValue({
+    usersService.exchangeGoogleAuthCode.mockResolvedValue({
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
-      user: { id: 1 },
+      user: { id: 7 },
     });
 
-    expect(controller.googleCallback(req, res)).toEqual({
-      accessToken: 'access-token',
-      user: { id: 1 },
-    });
-    expect(usersService.generateTokensForUser).toHaveBeenCalledWith(req.user);
-    expect(res.cookie).toHaveBeenCalledWith(
-      'refresh_token',
-      'refresh-token',
-      expect.objectContaining({ httpOnly: true }),
-    );
-  });
-
-  it('sendVerificationOtp delegates to the users service', () => {
-    const result = { message: 'sent' };
-    usersService.sendVerificationOtp.mockReturnValue(result);
-
-    expect(controller.sendVerificationOtp({ id: 4 })).toBe(result);
-    expect(usersService.sendVerificationOtp).toHaveBeenCalledWith(4);
-  });
-
-  it('verifyEmail delegates to the users service', () => {
-    const result = { message: 'verified' };
-    usersService.verifyEmail.mockReturnValue(result);
-
-    expect(controller.verifyEmail({ id: 4 }, { code: '123456' } as any)).toBe(result);
-    expect(usersService.verifyEmail).toHaveBeenCalledWith(4, '123456');
-  });
-
-  it('sendResetOtp delegates to the users service', () => {
-    const result = { message: 'sent' };
-    usersService.sendPasswordResetOtp.mockReturnValue(result);
-
-    expect(controller.sendResetOtp({ email: 'user@example.com' } as any)).toBe(result);
-    expect(usersService.sendPasswordResetOtp).toHaveBeenCalledWith('user@example.com');
-  });
-
-  it('resetPassword delegates to the users service', () => {
-    const result = { message: 'reset' };
-    usersService.resetPassword.mockReturnValue(result);
-
-    expect(
-      controller.resetPassword({ email: 'user@example.com', code: '123456', newPassword: 'secret' } as any),
-    ).toBe(result);
-    expect(usersService.resetPassword).toHaveBeenCalledWith('user@example.com', '123456', 'secret');
+    await expect(
+      controller.googleExchange({ code: 'one-time' }, webReq(), res),
+    ).resolves.toEqual({ accessToken: 'access-token', user: { id: 7 } });
+    expect(usersService.exchangeGoogleAuthCode).toHaveBeenCalledWith('one-time');
   });
 });

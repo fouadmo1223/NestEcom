@@ -9,6 +9,7 @@ import { join } from 'path';
 import cookieParser from 'cookie-parser';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 export function configureApp(app: NestExpressApplication): void {
   app.useStaticAssets(join(process.cwd(), 'src/uploads/files'), {
@@ -35,6 +36,7 @@ export function configureApp(app: NestExpressApplication): void {
     }),
   );
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
+  app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -49,7 +51,15 @@ export function configureApp(app: NestExpressApplication): void {
         }),
     }),
   );
-  app.enableCors();
+  const corsOrigins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  app.enableCors({
+    origin: corsOrigins.length > 0 ? corsOrigins : true,
+    credentials: true,
+    exposedHeaders: ['X-Client'],
+  });
 
   const config = new DocumentBuilder()
     .setTitle('My App API')

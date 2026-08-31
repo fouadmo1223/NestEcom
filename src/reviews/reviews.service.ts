@@ -1,77 +1,181 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Review } from './review.entity';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Review, ReviewStatus } from './review.entity';
 import { Product } from '../products/product.entity';
+import { Vendor } from '../vendors/entities/vendor.entity';
 import { CreateReviewDto } from './dtos/create-review.dto';
 import { UpdateReviewDto } from './dtos/update-review.dto';
 import { UserType } from '../users/user.entity';
+import { NotificationEvent } from '../notifications/notification-events';
+import { AppError } from '../common/errors/app-exception';
+import { ErrorCode } from '../common/errors/error-codes';
 
 type CurrentUser = { id: number; userType: UserType };
+const round = (n: number) => Math.round(n * 100) / 100;
 
 @Injectable()
 export class ReviewsService {
-    constructor(
-        @InjectRepository(Review)
-        private readonly reviewsRepository: Repository<Review>,
-        @InjectRepository(Product)
-        private readonly productsRepository: Repository<Product>,
-    ) {}
+  constructor(
+    @InjectRepository(Review) private readonly reviews: Repository<Review>,
+    @InjectRepository(Product) private readonly products: Repository<Product>,
+    @InjectRepository(Vendor) private readonly vendors: Repository<Vendor>,
+    private readonly events: EventEmitter2,
+  ) {}
 
-    async findAll(page: number, limit: number) {
-        const [data, total] = await this.reviewsRepository.findAndCount({
-            relations: { user: true, product: true },
-            skip: (page - 1) * limit,
-            take: limit,
-        });
-        return { data, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+  async findAll(page: number, limit: number, status?: string) {
+    const qb = this.reviews
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.user', 'user')
+      .leftJoinAndSelect('r.product', 'product')
+      .orderBy('r.createdAt', 'DESC');
+    if (status) qb.where('r.status = :status', { status });
+
+    const [data, total] = await qb
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+    return { data, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async findOne(id: number): Promise<Review> {
+    const review = await this.reviews.findOne({
+      where: { id },
+      relations: { user: true, product: true },
+    });
+    if (!review) throw AppError.notFound('Review not found');
+    return review;
+  }
+
+  findByProduct(productId: number): Promise<Review[]> {
+    return this.reviews.find({
+      where: { product: { id: productId }, status: ReviewStatus.PUBLISHED },
+      relations: { user: true },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async create(dto: CreateReviewDto, userId: number): Promise<Review> {
+    const product = await this.products.findOne({
+      where: { id: dto.productId },
+      relations: { vendor: true },
+    });
+    if (!product) throw AppError.notFound('Product not found');
+
+    const existing = await this.reviews.findOne({
+      where: { product: { id: dto.productId }, user: { id: userId } },
+    });
+    if (existing) {
+      throw AppError.conflict('You have already reviewed this product', ErrorCode.CONFLICT);
     }
 
-    async findOne(id: number): Promise<Review> {
-        const review = await this.reviewsRepository.findOne({
-            where: { id },
-            relations: { user: true, product: true },
-        });
-        if (!review) throw new NotFoundException('Review not found');
-        return review;
-    }
+    const isVerifiedPurchase = await this.hasDeliveredPurchase(userId, dto.productId);
 
-    findByProduct(productId: number): Promise<Review[]> {
-        return this.reviewsRepository.find({
-            where: { product: { id: productId } },
-            relations: { user: true },
-        });
-    }
+    const saved = await this.reviews.save(
+      this.reviews.create({
+        rating: dto.rating,
+        comment: dto.comment ?? null,
+        isVerifiedPurchase,
+        product: { id: dto.productId },
+        user: { id: userId },
+      }),
+    );
 
-    async create(dto: CreateReviewDto, userId: number): Promise<Review> {
-        const product = await this.productsRepository.findOneBy({ id: dto.productId });
-        if (!product) throw new NotFoundException('Product not found');
-
-        const review = this.reviewsRepository.create({
-            rating: dto.rating,
-            comment: dto.comment,
-            product: { id: dto.productId },
-            user: { id: userId },
-        });
-        return this.reviewsRepository.save(review);
+    if (product.vendorId) await this.recomputeVendorRating(product.vendorId);
+    if (product.vendor?.userId) {
+      this.events.emit(NotificationEvent.REVIEW_CREATED, {
+        vendorUserId: product.vendor.userId,
+        productId: product.id,
+        productTitle: product.title,
+        rating: dto.rating,
+      });
     }
+    return saved;
+  }
 
-    async update(id: number, dto: UpdateReviewDto, currentUser: CurrentUser): Promise<Review> {
-        const review = await this.findOne(id);
-        this.checkOwnership(review, currentUser);
-        Object.assign(review, dto);
-        return this.reviewsRepository.save(review);
-    }
+  async update(id: number, dto: UpdateReviewDto, currentUser: CurrentUser): Promise<Review> {
+    const review = await this.findOne(id);
+    this.assertOwner(review, currentUser);
+    Object.assign(review, dto);
+    const saved = await this.reviews.save(review);
+    if (review.product) await this.recomputeVendorRating(review.product.vendorId);
+    return saved;
+  }
 
-    async delete(id: number, currentUser: CurrentUser): Promise<Review> {
-        const review = await this.findOne(id);
-        this.checkOwnership(review, currentUser);
-        return this.reviewsRepository.remove(review);
-    }
+  async delete(id: number, currentUser: CurrentUser): Promise<{ message: string }> {
+    const review = await this.findOne(id);
+    this.assertOwner(review, currentUser);
+    const vendorId = review.product?.vendorId;
+    await this.reviews.remove(review);
+    if (vendorId) await this.recomputeVendorRating(vendorId);
+    return { message: 'Review deleted' };
+  }
 
-    private checkOwnership(review: Review, currentUser: CurrentUser): void {
-        const isSuperAdmin = currentUser.userType === UserType.SUPER_ADMIN;
-        const isOwner = review.user?.id === currentUser.id;
-        if (!isSuperAdmin && !isOwner) throw new ForbiddenException('Access denied');
+  /** Vendor replies to a review on one of their own products. */
+  async reply(id: number, vendorUserId: number, text: string): Promise<Review> {
+    const review = await this.reviews.findOne({
+      where: { id },
+      relations: { product: { vendor: true } },
+    });
+    if (!review) throw AppError.notFound('Review not found');
+    if (review.product?.vendor?.userId !== vendorUserId) {
+      throw AppError.forbidden('You can only reply to reviews on your own products');
     }
+    review.vendorReply = text.trim();
+    review.vendorRepliedAt = new Date();
+    return this.reviews.save(review);
+  }
+
+  /** Super-admin moderation. */
+  async setStatus(id: number, status: ReviewStatus): Promise<Review> {
+    const review = await this.findOne(id);
+    review.status = status;
+    const saved = await this.reviews.save(review);
+    if (review.product) await this.recomputeVendorRating(review.product.vendorId);
+    return saved;
+  }
+
+  // ─── internals ───────────────────────────────────────────────────────
+
+  private async hasDeliveredPurchase(userId: number, productId: number): Promise<boolean> {
+    const row = await this.reviews.manager.query(
+      `SELECT 1 FROM order_items oi
+         JOIN vendor_orders vo ON vo.id = oi."vendorOrderId"
+         JOIN customer_orders co ON co.id = vo."customerOrderId"
+        WHERE oi."productId" = $1 AND co."userId" = $2 AND vo.status = 'delivered'
+        LIMIT 1`,
+      [productId, userId],
+    );
+    return Array.isArray(row) && row.length > 0;
+  }
+
+  private async recomputeVendorRating(vendorId: number | null | undefined): Promise<void> {
+    if (!vendorId) return;
+    const row = await this.reviews
+      .createQueryBuilder('r')
+      .innerJoin('r.product', 'p')
+      .select('COALESCE(AVG(r.rating), 0)', 'avg')
+      .addSelect('COUNT(r.id)', 'count')
+      .where('p."vendorId" = :vendorId AND r.status = :published', {
+        vendorId,
+        published: ReviewStatus.PUBLISHED,
+      })
+      .getRawOne<{ avg: string; count: string }>();
+
+    await this.vendors.update(
+      { id: vendorId },
+      {
+        ratingAverage: round(parseFloat(row?.avg ?? '0')),
+        ratingCount: parseInt(row?.count ?? '0', 10),
+      },
+    );
+  }
+
+  private assertOwner(review: Review, currentUser: CurrentUser): void {
+    const isSuperAdmin = currentUser.userType === UserType.SUPER_ADMIN;
+    if (!isSuperAdmin && review.user?.id !== currentUser.id) {
+      throw AppError.forbidden('Access denied');
+    }
+  }
 }

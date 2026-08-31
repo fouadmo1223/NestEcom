@@ -5,15 +5,30 @@ export function createDatabaseOptions(
   config: ConfigService,
 ): TypeOrmModuleOptions {
   const databaseUrl = config.get<string>('DATABASE_URL');
-  const synchronize = config.get<string>('NODE_ENV') !== 'production';
+  const nodeEnv = config.get<string>('NODE_ENV');
+
+  // `synchronize` stays on only in local dev until the baseline migration is
+  // generated; then set DB_SYNC=false everywhere and rely on migrations.
+  const synchronize =
+    config.get<string>('DB_SYNC') === 'true' ||
+    (config.get<string>('DB_SYNC') !== 'false' && nodeEnv !== 'production');
+
+  const migrationsRun = config.get<string>('DB_MIGRATIONS_RUN') === 'true';
+
+  const shared = {
+    autoLoadEntities: true,
+    synchronize,
+    migrations: ['dist/db/migrations/*.js'],
+    migrationsRun,
+    migrationsTableName: 'typeorm_migrations',
+  };
 
   if (databaseUrl) {
     return {
       type: 'postgres',
       url: databaseUrl,
       ssl: { rejectUnauthorized: false },
-      autoLoadEntities: true,
-      synchronize,
+      ...shared,
     };
   }
 
@@ -24,7 +39,6 @@ export function createDatabaseOptions(
     username: config.get<string>('DB_USERNAME'),
     password: config.get<string>('DB_PASSWORD'),
     database: config.get<string>('DB_NAME'),
-    autoLoadEntities: true,
-    synchronize,
+    ...shared,
   };
 }

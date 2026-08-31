@@ -1,19 +1,30 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsOptional, IsPositive, IsString } from 'class-validator';
+import { IsInt, IsOptional, IsPositive, IsString, MaxLength } from 'class-validator';
 
 export class CheckoutDto {
-    @ApiProperty({ example: 1, description: 'The ID of the shipping address' })
-    @IsInt()
-    @IsPositive()
-    addressId!: number;
+  @ApiProperty({ example: 1, description: 'Shipping address id' })
+  @IsInt()
+  @IsPositive()
+  addressId!: number;
 
-    @ApiProperty({ example: 'SUMMER2024', description: 'An optional coupon code to apply to the order', required: false })
-    @IsOptional()
-    @IsString()
-    couponCode?: string;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  couponCode?: string;
 
-    @ApiProperty({ example: 'Please leave the package at the front door.', description: 'Optional notes for the order', required: false })
-    @IsOptional()
-    @IsString()
-    notes?: string;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  notes?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Client-generated key; a repeated key returns the same order.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  idempotencyKey?: string;
 }

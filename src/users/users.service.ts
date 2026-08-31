@@ -285,6 +285,39 @@ export class UsersService {
     return user;
   }
 
+  /**
+   * Issues a short-lived (2 min) single-use code after a successful Google
+   * login. The OAuth callback redirects the browser to the frontend with this
+   * code; the SPA then calls POST /auth/google/exchange to obtain real tokens.
+   * Avoids leaking tokens in a redirect URL that lands in browser history.
+   */
+  issueGoogleAuthCode(user: User): string {
+    return this.jwtService.sign(
+      { sub: user.id, purpose: 'google_oauth' },
+      {
+        secret: this.configService.get<string>('JWT_SECRET'),
+        expiresIn: '2m',
+      },
+    );
+  }
+
+  async exchangeGoogleAuthCode(code: string): Promise<AuthResponse> {
+    let payload: { sub: number; purpose?: string };
+    try {
+      payload = this.jwtService.verify(code, {
+        secret: this.configService.get<string>('JWT_SECRET'),
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid or expired code');
+    }
+    if (payload.purpose !== 'google_oauth') {
+      throw new UnauthorizedException('Invalid code');
+    }
+    const user = await this.usersRepository.findOneBy({ id: payload.sub });
+    if (!user) throw new UnauthorizedException('User not found');
+    return this.generateTokensForUser(user);
+  }
+
   generateTokensForUser(user: User): {
     accessToken: string;
     refreshToken: string;
@@ -323,6 +356,36 @@ export class UsersService {
     user.isAccountVerified = true;
     await this.usersRepository.save(user);
     return { message: 'Email verified successfully' };
+  }
+
+  /**
+   * Public verification path (no JWT): a freshly-registered user cannot log in
+   * until verified, so they identify themselves by email + OTP — same shape as
+   * the password-reset flow. The generic error avoids account enumeration.
+   */
+  async verifyAccountByEmail(
+    email: string,
+    code: string,
+  ): Promise<{ message: string }> {
+    const user = await this.usersRepository.findOneBy({ email });
+    if (!user) throw new BadRequestException('Invalid or expired OTP');
+    if (user.isAccountVerified) {
+      throw new BadRequestException('Account is already verified');
+    }
+    await this.consumeOtp(user.id, code, OtpType.EMAIL_VERIFICATION);
+    user.isAccountVerified = true;
+    await this.usersRepository.save(user);
+    return { message: 'Email verified successfully' };
+  }
+
+  async resendVerificationByEmail(email: string): Promise<{ message: string }> {
+    const successMsg = {
+      message: 'If the account exists and is unverified, a new code has been sent',
+    };
+    const user = await this.usersRepository.findOneBy({ email });
+    if (!user || user.isAccountVerified) return successMsg;
+    await this.issueOtp(user, OtpType.EMAIL_VERIFICATION);
+    return successMsg;
   }
 
   // ─── Password Reset ──────────────────────────────────────────────────────

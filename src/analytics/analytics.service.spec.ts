@@ -1,9 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AnalyticsService } from './analytics.service';
-import { Order, OrderStatus } from '../orders/order.entity';
-import { OrderItem } from '../orders/order-item.entity';
+import { CustomerOrder, CustomerOrderStatus } from '../orders/entities/customer-order.entity';
+import { VendorOrder } from '../orders/entities/vendor-order.entity';
+import { OrderItem } from '../orders/entities/order-item.entity';
 import { User } from '../users/user.entity';
+import { Vendor } from '../vendors/entities/vendor.entity';
 
 const createQueryBuilderMock = () => ({
   select: jest.fn().mockReturnThis(),
@@ -13,28 +15,36 @@ const createQueryBuilderMock = () => ({
   orderBy: jest.fn().mockReturnThis(),
   andWhere: jest.fn().mockReturnThis(),
   innerJoin: jest.fn().mockReturnThis(),
+  leftJoin: jest.fn().mockReturnThis(),
   addGroupBy: jest.fn().mockReturnThis(),
   limit: jest.fn().mockReturnThis(),
   getRawMany: jest.fn(),
+  getRawOne: jest.fn(),
 });
 
 describe('AnalyticsService', () => {
   let service: AnalyticsService;
-  let orderRepo: { createQueryBuilder: jest.Mock };
+  let orderRepo: { createQueryBuilder: jest.Mock; count: jest.Mock };
+  let vendorOrderRepo: { createQueryBuilder: jest.Mock; count: jest.Mock };
   let itemRepo: { createQueryBuilder: jest.Mock };
   let userRepo: { createQueryBuilder: jest.Mock; count: jest.Mock };
+  let vendorRepo: { createQueryBuilder: jest.Mock; count: jest.Mock; findOneBy: jest.Mock };
 
   beforeEach(async () => {
-    orderRepo = { createQueryBuilder: jest.fn() };
+    orderRepo = { createQueryBuilder: jest.fn(), count: jest.fn() };
+    vendorOrderRepo = { createQueryBuilder: jest.fn(), count: jest.fn() };
     itemRepo = { createQueryBuilder: jest.fn() };
     userRepo = { createQueryBuilder: jest.fn(), count: jest.fn() };
+    vendorRepo = { createQueryBuilder: jest.fn(), count: jest.fn(), findOneBy: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AnalyticsService,
-        { provide: getRepositoryToken(Order), useValue: orderRepo },
+        { provide: getRepositoryToken(CustomerOrder), useValue: orderRepo },
+        { provide: getRepositoryToken(VendorOrder), useValue: vendorOrderRepo },
         { provide: getRepositoryToken(OrderItem), useValue: itemRepo },
         { provide: getRepositoryToken(User), useValue: userRepo },
+        { provide: getRepositoryToken(Vendor), useValue: vendorRepo },
       ],
     }).compile();
 
@@ -61,8 +71,12 @@ describe('AnalyticsService', () => {
         { date: '2024-01-02', revenue: 5.5, orders: 1 },
       ],
     });
-    expect(qb.andWhere).toHaveBeenNthCalledWith(1, 'order.createdAt >= :startDate', { startDate: '2024-01-01' });
-    expect(qb.andWhere).toHaveBeenNthCalledWith(2, 'order.createdAt <= :endDate', { endDate: '2024-01-31' });
+    expect(qb.andWhere).toHaveBeenNthCalledWith(1, 'order.placedAt >= :startDate', {
+      startDate: '2024-01-01',
+    });
+    expect(qb.andWhere).toHaveBeenNthCalledWith(2, 'order.placedAt <= :endDate', {
+      endDate: '2024-01-31',
+    });
   });
 
   it('getBestSelling maps raw query rows to numeric values', async () => {
@@ -80,12 +94,12 @@ describe('AnalyticsService', () => {
 
   it('getOrdersByStatus returns zero for statuses missing from the query result', async () => {
     const qb = createQueryBuilderMock();
-    qb.getRawMany.mockResolvedValue([{ status: OrderStatus.PENDING, count: '3' }]);
+    qb.getRawMany.mockResolvedValue([{ status: CustomerOrderStatus.PENDING, count: '3' }]);
     orderRepo.createQueryBuilder.mockReturnValue(qb);
 
     const result = await service.getOrdersByStatus();
 
-    expect(result[OrderStatus.PENDING]).toBe(3);
-    expect(result[OrderStatus.CANCELLED]).toBe(0);
+    expect(result[CustomerOrderStatus.PENDING]).toBe(3);
+    expect(result[CustomerOrderStatus.CANCELLED]).toBe(0);
   });
 });

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { WishlistController } from './wishlist.controller';
 import { WishlistService } from './wishlist.service';
+import { authGuardProviders } from '../testing/auth-guard-providers';
 
 describe('WishlistController', () => {
   let controller: WishlistController;
@@ -19,7 +20,7 @@ describe('WishlistController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WishlistController],
-      providers: [{ provide: WishlistService, useValue: service }],
+      providers: [{ provide: WishlistService, useValue: service }, ...authGuardProviders],
     }).compile();
 
     controller = module.get(WishlistController);

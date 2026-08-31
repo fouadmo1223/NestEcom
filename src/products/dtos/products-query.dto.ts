@@ -42,4 +42,22 @@ export class ProductsQueryDto extends PaginationDto {
     @IsOptional()
     @IsIn(['new', 'sale', 'featured'])
     tag?: 'new' | 'sale' | 'featured';
+
+    @ApiProperty({ description: 'Filter to a single store (public storefront)', required: false })
+    @IsOptional()
+    @IsString()
+    vendorSlug?: string;
+}
+
+/** Vendor-scoped product listing (own catalogue, all statuses). */
+export class VendorProductsQueryDto extends ProductsQueryDto {
+    @ApiProperty({ enum: ['draft', 'active', 'archived'], required: false })
+    @IsOptional()
+    @IsIn(['draft', 'active', 'archived'])
+    status?: 'draft' | 'active' | 'archived';
+
+    @ApiProperty({ description: 'Only products at or below this stock level', required: false })
+    @IsOptional()
+    @IsNumberString()
+    lowStock?: string;
 }

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ReviewsController } from './reviews.controller';
 import { ReviewsService } from './reviews.service';
 import { UserType } from '../users/user.entity';
+import { authGuardProviders } from '../testing/auth-guard-providers';
 
 describe('ReviewsController', () => {
   let controller: ReviewsController;
@@ -26,7 +27,7 @@ describe('ReviewsController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ReviewsController],
-      providers: [{ provide: ReviewsService, useValue: service }],
+      providers: [{ provide: ReviewsService, useValue: service }, ...authGuardProviders],
     }).compile();
 
     controller = module.get(ReviewsController);

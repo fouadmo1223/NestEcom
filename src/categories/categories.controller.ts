@@ -45,7 +45,7 @@ export class CategoriesController {
 
     @Post()
     @UseGuards(JwtGuard, RolesGuard)
-    @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
+    @Roles(UserType.SUPER_ADMIN)
     @UseInterceptors(FileInterceptor('image', imageMulterOptions))
     @ApiBearerAuth()
     @ApiOperation({ summary: 'Create a new category', description: 'Creates a new category. Requires admin privileges.' })
@@ -63,7 +63,7 @@ export class CategoriesController {
 
     @Patch(':id')
     @UseGuards(JwtGuard, RolesGuard)
-    @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
+    @Roles(UserType.SUPER_ADMIN)
     @UseInterceptors(FileInterceptor('image', imageMulterOptions))
     @ApiBearerAuth()
     @ApiOperation({ summary: 'Update a category', description: 'Updates an existing category. Requires admin privileges.' })
@@ -84,7 +84,7 @@ export class CategoriesController {
 
     @Delete(':id')
     @UseGuards(JwtGuard, RolesGuard)
-    @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
+    @Roles(UserType.SUPER_ADMIN)
     @ApiBearerAuth()
     @ApiOperation({ summary: 'Delete a category', description: 'Deletes a category. Requires admin privileges.' })
     @ApiParam({ name: 'id', type: Number, description: 'Category ID' })

@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
+import { authGuardProviders } from '../testing/auth-guard-providers';
 
 describe('UploadController', () => {
   let controller: UploadController;
@@ -20,7 +21,7 @@ describe('UploadController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UploadController],
-      providers: [{ provide: UploadService, useValue: service }],
+      providers: [{ provide: UploadService, useValue: service }, ...authGuardProviders],
     }).compile();
 
     controller = module.get(UploadController);

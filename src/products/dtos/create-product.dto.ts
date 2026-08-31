@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
-import { IsArray, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsEnum, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { ApiProperty, ApiTags } from '@nestjs/swagger';
+import { ProductStatus } from '../product.entity';
 
 @ApiTags('Products')
 export class CreateProductDto {
@@ -39,4 +40,16 @@ export class CreateProductDto {
     @IsArray()
     @IsIn(['new', 'sale', 'featured'], { each: true })
     tags?: string[];
+
+    @ApiProperty({ enum: ProductStatus, required: false, description: 'Defaults to draft' })
+    @IsOptional()
+    @IsEnum(ProductStatus)
+    status?: ProductStatus;
+
+    @ApiProperty({ description: 'Image URLs (when not uploading files)', required: false, isArray: true })
+    @IsOptional()
+    @Transform(({ value }) => (typeof value === 'string' ? [value] : value))
+    @IsArray()
+    @IsString({ each: true })
+    imageUrls?: string[];
 }

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AnalyticsController } from './analytics.controller';
 import { AnalyticsService } from './analytics.service';
+import { authGuardProviders } from '../testing/auth-guard-providers';
 
 describe('AnalyticsController', () => {
   let controller: AnalyticsController;
@@ -21,7 +22,7 @@ describe('AnalyticsController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AnalyticsController],
-      providers: [{ provide: AnalyticsService, useValue: service }],
+      providers: [{ provide: AnalyticsService, useValue: service }, ...authGuardProviders],
     }).compile();
 
     controller = module.get(AnalyticsController);

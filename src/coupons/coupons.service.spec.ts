@@ -2,7 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { CouponsService } from './coupons.service';
-import { Coupon, DiscountType } from './coupon.entity';
+import { Coupon, CouponScope, DiscountType } from './coupon.entity';
 
 describe('CouponsService', () => {
   let service: CouponsService;
@@ -45,13 +45,15 @@ describe('CouponsService', () => {
     await expect(service.findOne(1)).rejects.toThrow(NotFoundException);
   });
 
-  it('create normalizes nullable fields before saving', async () => {
+  it('create normalizes nullable fields and defaults the scope before saving', async () => {
     const dto = { code: 'SAVE10', discountValue: 10 } as any;
     const created = {
       ...dto,
       minOrderAmount: null,
       maxUses: null,
       expiresAt: null,
+      scope: CouponScope.PLATFORM,
+      vendorId: null,
     };
     repo.create.mockReturnValue(created);
     repo.save.mockResolvedValue({ id: 1, ...created });
@@ -60,13 +62,15 @@ describe('CouponsService', () => {
     expect(repo.create).toHaveBeenCalledWith(created);
   });
 
-  it('validate rejects inactive or missing coupons', async () => {
+  it('evaluate rejects inactive or missing coupons', async () => {
     repo.findOneBy.mockResolvedValue(null);
 
-    await expect(service.validate('save10', 100)).rejects.toThrow(BadRequestException);
+    await expect(service.evaluate('save10', [{ vendorId: 1, subtotal: 100 }])).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
-  it('validate calculates percentage discounts and rounds the result', async () => {
+  it('evaluate calculates percentage discounts, rounds, and allocates per vendor', async () => {
     repo.findOneBy.mockResolvedValue({
       id: 2,
       code: 'SAVE10',
@@ -75,14 +79,17 @@ describe('CouponsService', () => {
       maxUses: null,
       usedCount: 0,
       minOrderAmount: null,
+      scope: CouponScope.PLATFORM,
+      vendorId: null,
       discountType: DiscountType.PERCENTAGE,
       discountValue: 12.345,
     });
 
-    await expect(service.validate('save10', 80)).resolves.toEqual({
-      coupon: expect.objectContaining({ code: 'SAVE10' }),
-      discountAmount: 9.88,
-    });
+    const result = await service.evaluate('save10', [{ vendorId: 1, subtotal: 80 }]);
+
+    expect(result.discountTotal).toBe(9.88);
+    expect(result.allocations).toEqual([{ vendorId: 1, amount: 9.88 }]);
+    expect(result.coupon).toEqual(expect.objectContaining({ code: 'SAVE10' }));
   });
 
   it('incrementUsage increments the coupon usage counter', async () => {

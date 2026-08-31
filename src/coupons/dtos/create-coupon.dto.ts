@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsDate, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
-import { DiscountType } from '../coupon.entity';
+import { CouponScope, DiscountType } from '../coupon.entity';
 
 export class CreateCouponDto {
     @ApiProperty({ example: 'SUMMER2024', description: 'The coupon code' })
@@ -41,4 +41,23 @@ export class CreateCouponDto {
     @IsOptional()
     @IsBoolean()
     isActive?: boolean;
+
+    @ApiProperty({ enum: CouponScope, required: false, description: 'Defaults to platform' })
+    @IsOptional()
+    @IsEnum(CouponScope)
+    scope?: CouponScope;
+
+    @ApiProperty({ required: false, description: 'Vendor id (required when scope = vendor)' })
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    vendorId?: number;
+}
+
+export class ValidateCouponDto {
+    @ApiProperty({ example: 'SUMMER2024' })
+    @IsString()
+    @IsNotEmpty()
+    @Transform(({ value }) => String(value).toUpperCase().trim())
+    code!: string;
 }

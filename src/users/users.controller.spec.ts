@@ -4,6 +4,7 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { UserType } from './user.entity';
+import { authGuardProviders } from '../testing/auth-guard-providers';
 
 describe('UsersController', () => {
   let controller: UsersController;
@@ -45,6 +46,7 @@ describe('UsersController', () => {
       providers: [
         { provide: UsersService, useValue: usersService },
         { provide: CloudinaryService, useValue: cloudinaryService },
+        ...authGuardProviders,
       ],
     }).compile();
 

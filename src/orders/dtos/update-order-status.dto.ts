@@ -1,14 +1,29 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
-import { OrderStatus } from '../order.entity';
+import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { VendorOrderStatus } from '../entities/vendor-order.entity';
 
-export class UpdateOrderStatusDto {
-    @ApiProperty({ enum: OrderStatus, description: 'The new status of the order' })
-    @IsEnum(OrderStatus)
-    status!: OrderStatus;
+export class UpdateVendorOrderStatusDto {
+  @ApiProperty({ enum: VendorOrderStatus })
+  @IsEnum(VendorOrderStatus)
+  status!: VendorOrderStatus;
 
-    @ApiProperty({ example: '1Z999AA10123456784', description: 'The tracking number for the shipment', required: false })
-    @IsOptional()
-    @IsString()
-    trackingNumber?: string;
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  trackingNumber?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  carrier?: string;
+}
+
+export class CancelVendorOrderDto {
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  reason?: string;
 }

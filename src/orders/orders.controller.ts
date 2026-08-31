@@ -1,91 +1,71 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
 import { CheckoutDto } from './dtos/checkout.dto';
-import { UpdateOrderStatusDto } from './dtos/update-order-status.dto';
+import { AdminOrdersQueryDto, MyOrdersQueryDto } from './dtos/orders-query.dto';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UserType } from '../users/user.entity';
-import { PaginationDto } from '../common/dtos/pagination.dto';
-import { Order } from './order.entity';
 
-type CurrentUserPayload = { id: number; userType: UserType; email: string };
+type Actor = { id: number; userType: UserType; email: string };
 
 @ApiTags('Orders')
 @ApiBearerAuth()
 @Controller('orders')
 @UseGuards(JwtGuard)
 export class OrdersController {
-    constructor(private readonly ordersService: OrdersService) {}
+  constructor(private readonly ordersService: OrdersService) {}
 
-    @Post('checkout')
-    @ApiOperation({ summary: 'Checkout', description: 'Creates a new order from the user\'s cart.' })
-    @ApiResponse({ status: 201, description: 'The order has been successfully created.', type: Order })
-    @ApiResponse({ status: 400, description: 'Bad request.' })
-    @ApiResponse({ status: 404, description: 'Cart not found or some products are not available.' })
-    checkout(@CurrentUser() user: CurrentUserPayload, @Body() dto: CheckoutDto) {
-        return this.ordersService.checkout(user.id, user.email, dto);
-    }
+  @Post('checkout')
+  @ApiOperation({ summary: 'Place an order from the current cart (Cash on Delivery)' })
+  checkout(
+    @CurrentUser() user: Actor,
+    @Body() dto: CheckoutDto,
+    @Headers('idempotency-key') headerKey?: string,
+  ) {
+    return this.ordersService.checkout(user.id, user.email, {
+      ...dto,
+      idempotencyKey: dto.idempotencyKey ?? headerKey,
+    });
+  }
 
-    @Get('my')
-    @ApiOperation({ summary: 'Get my orders', description: 'Retrieves the orders of the current user.' })
-    @ApiResponse({ status: 200, description: 'A list of the user\'s orders.', type: [Order] })
-    @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number for pagination.' })
-    @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of items per page.' })
-    getMyOrders(@CurrentUser() user: CurrentUserPayload, @Query() pagination: PaginationDto) {
-        return this.ordersService.findMyOrders(user.id, pagination);
-    }
+  @Get('my')
+  getMyOrders(@CurrentUser() user: Actor, @Query() query: MyOrdersQueryDto) {
+    return this.ordersService.findMyOrders(user.id, query);
+  }
 
-    @Get(':id')
-    @ApiOperation({ summary: 'Get one order', description: 'Retrieves a single order by its ID.' })
-    @ApiResponse({ status: 200, description: 'The requested order.', type: Order })
-    @ApiResponse({ status: 404, description: 'Order not found.' })
-    @ApiParam({ name: 'id', type: Number, description: 'The ID of the order.' })
-    getOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: CurrentUserPayload) {
-        return this.ordersService.findOne(id, user);
-    }
+  @Get('admin')
+  @UseGuards(RolesGuard)
+  @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'List every customer order (filters) — admin' })
+  getAllAdmin(@Query() query: AdminOrdersQueryDto) {
+    return this.ordersService.findAllAdmin(query);
+  }
 
-    @Get()
-    @ApiOperation({
-        summary: 'Get all orders (Admin)',
-        description: 'Retrieves all orders. Requires Admin or Super Admin role.',
-    })
-    @ApiResponse({ status: 200, description: 'A list of all orders.', type: [Order] })
-    @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number for pagination.' })
-    @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of items per page.' })
-    @UseGuards(RolesGuard)
-    @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
-    getAll(@Query() pagination: PaginationDto) {
-        return this.ordersService.findAll(pagination);
-    }
+  @Get(':id')
+  getOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: Actor) {
+    return this.ordersService.findOneForUser(id, user);
+  }
 
-    @Patch(':id/cancel')
-    @ApiOperation({ summary: 'Cancel an order', description: 'Allows a user to cancel their own order.' })
-    @ApiResponse({ status: 200, description: 'The order has been successfully cancelled.', type: Order })
-    @ApiResponse({ status: 404, description: 'Order not found.' })
-    @ApiResponse({ status: 400, description: 'Order cannot be cancelled.' })
-    @ApiParam({ name: 'id', type: Number, description: 'The ID of the order to cancel.' })
-    cancelOrder(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: CurrentUserPayload) {
-        return this.ordersService.cancelOrder(id, user.id);
-    }
-
-    @Patch(':id/status')
-    @ApiOperation({
-        summary: 'Update order status (Admin)',
-        description: 'Updates the status of an order. Requires Admin or Super Admin role.',
-    })
-    @ApiResponse({ status: 200, description: 'The order status has been successfully updated.', type: Order })
-    @ApiResponse({ status: 404, description: 'Order not found.' })
-    @ApiParam({ name: 'id', type: Number, description: 'The ID of the order to update.' })
-    @UseGuards(RolesGuard)
-    @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
-    updateStatus(
-        @Param('id', ParseIntPipe) id: number,
-        @Body() dto: UpdateOrderStatusDto,
-        @CurrentUser() user: CurrentUserPayload,
-    ) {
-        return this.ordersService.updateStatus(id, dto, user.email);
-    }
+  @Patch(':id/cancel')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cancel your order while every item is still pending' })
+  cancel(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: Actor) {
+    return this.ordersService.cancelOrder(id, user.id);
+  }
 }
