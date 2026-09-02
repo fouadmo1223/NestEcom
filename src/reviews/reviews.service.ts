@@ -11,6 +11,7 @@ import { UserType } from '../users/user.entity';
 import { NotificationEvent } from '../notifications/notification-events';
 import { AppError } from '../common/errors/app-exception';
 import { ErrorCode } from '../common/errors/error-codes';
+import { AuditService } from '../common/audit/audit.service';
 
 type CurrentUser = { id: number; userType: UserType };
 const round = (n: number) => Math.round(n * 100) / 100;
@@ -22,15 +23,28 @@ export class ReviewsService {
     @InjectRepository(Product) private readonly products: Repository<Product>,
     @InjectRepository(Vendor) private readonly vendors: Repository<Vendor>,
     private readonly events: EventEmitter2,
+    private readonly audit: AuditService,
   ) {}
 
-  async findAll(page: number, limit: number, status?: string) {
+  async findAll(
+    page: number,
+    limit: number,
+    status?: string,
+    search?: string,
+    sort?: 'newest' | 'oldest',
+  ) {
     const qb = this.reviews
       .createQueryBuilder('r')
       .leftJoinAndSelect('r.user', 'user')
       .leftJoinAndSelect('r.product', 'product')
-      .orderBy('r.createdAt', 'DESC');
-    if (status) qb.where('r.status = :status', { status });
+      .orderBy('r.createdAt', sort === 'oldest' ? 'ASC' : 'DESC');
+    if (status) qb.andWhere('r.status = :status', { status });
+    if (search) {
+      qb.andWhere(
+        '(product.title ILIKE :s OR user.username ILIKE :s OR user.email ILIKE :s)',
+        { s: `%${search}%` },
+      );
+    }
 
     const [data, total] = await qb
       .skip((page - 1) * limit)
@@ -128,11 +142,18 @@ export class ReviewsService {
   }
 
   /** Super-admin moderation. */
-  async setStatus(id: number, status: ReviewStatus): Promise<Review> {
+  async setStatus(id: number, status: ReviewStatus, actorId?: number): Promise<Review> {
     const review = await this.findOne(id);
     review.status = status;
     const saved = await this.reviews.save(review);
     if (review.product) await this.recomputeVendorRating(review.product.vendorId);
+    await this.audit.record({
+      actorId: actorId ?? null,
+      action: 'review.moderated',
+      entityType: 'review',
+      entityId: id,
+      metadata: { status, productId: review.product?.id ?? null },
+    });
     return saved;
   }
 

@@ -20,6 +20,7 @@ import { MoneyModule } from './money/money.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PlatformModule } from './platform/platform.module';
 import { AuditModule } from './common/audit/audit.module';
+import { VariantAttributesModule } from './variant-attributes/variant-attributes.module';
 import { LoggerMiddleware } from './utils/middleware/logger.middleware';
 import { APP_GUARD } from '@nestjs/core';
 import { DatabaseModule } from './db/database.module';
@@ -39,6 +40,7 @@ import { AppController } from './app.controller';
     UsersModule,
     AuthModule,
     CategoriesModule,
+    VariantAttributesModule,
     UploadModule,
     MailModule,
     CartModule,

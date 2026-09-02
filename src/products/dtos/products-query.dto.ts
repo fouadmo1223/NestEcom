@@ -60,4 +60,19 @@ export class VendorProductsQueryDto extends ProductsQueryDto {
     @IsOptional()
     @IsNumberString()
     lowStock?: string;
+
+    @ApiProperty({ description: 'Admin: restrict to one vendor', required: false })
+    @IsOptional()
+    @IsNumberString()
+    vendorId?: string;
+
+    @ApiProperty({ description: 'Created on/after this ISO date', required: false })
+    @IsOptional()
+    @IsString()
+    from?: string;
+
+    @ApiProperty({ description: 'Created on/before this ISO date', required: false })
+    @IsOptional()
+    @IsString()
+    to?: string;
 }

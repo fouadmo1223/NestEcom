@@ -1,4 +1,5 @@
-import { IsDateString, IsOptional } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsDateString, IsInt, IsOptional, Max, Min } from 'class-validator';
 
 export class AnalyticsDateRangeDto {
     @IsOptional()
@@ -8,4 +9,14 @@ export class AnalyticsDateRangeDto {
     @IsOptional()
     @IsDateString()
     endDate?: string;
+}
+
+/** Date range + a `limit` (used by ranked list endpoints). */
+export class RankedRangeDto extends AnalyticsDateRangeDto {
+    @IsOptional()
+    @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+    @IsInt()
+    @Min(1)
+    @Max(100)
+    limit?: number;
 }

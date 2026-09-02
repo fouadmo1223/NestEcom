@@ -3,8 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Coupon, CouponScope, DiscountType } from './coupon.entity';
 import { CreateCouponDto } from './dtos/create-coupon.dto';
+import { UpdateCouponDto } from './dtos/update-coupon.dto';
 import { AppError } from '../common/errors/app-exception';
 import { ErrorCode } from '../common/errors/error-codes';
+import { AuditService } from '../common/audit/audit.service';
 
 export interface CartGroupInput {
   vendorId: number;
@@ -24,6 +26,7 @@ const round = (n: number) => Math.round(n * 100) / 100;
 export class CouponsService {
   constructor(
     @InjectRepository(Coupon) private readonly couponRepo: Repository<Coupon>,
+    private readonly audit: AuditService,
   ) {}
 
   findAll(): Promise<Coupon[]> {
@@ -45,18 +48,87 @@ export class CouponsService {
       scope: dto.scope ?? CouponScope.PLATFORM,
       vendorId: dto.scope === CouponScope.VENDOR ? (dto.vendorId ?? null) : null,
     });
-    return this.couponRepo.save(coupon);
+    const saved = await this.couponRepo.save(coupon);
+    await this.audit.record({
+      action: 'coupon.created',
+      entityType: 'coupon',
+      entityId: saved.id,
+      metadata: {
+        code: saved.code,
+        discountType: saved.discountType,
+        discountValue: saved.discountValue,
+      },
+    });
+    return saved;
+  }
+
+  async update(id: number, dto: UpdateCouponDto): Promise<Coupon> {
+    const coupon = await this.findOne(id);
+
+    if (dto.code !== undefined && dto.code !== coupon.code) {
+      const clash = await this.couponRepo.findOneBy({ code: dto.code });
+      if (clash) {
+        throw AppError.badRequest('A coupon with this code already exists', ErrorCode.BAD_REQUEST);
+      }
+      coupon.code = dto.code;
+    }
+    if (dto.discountType !== undefined) coupon.discountType = dto.discountType;
+    if (dto.discountValue !== undefined) coupon.discountValue = dto.discountValue;
+    if (dto.minOrderAmount !== undefined) coupon.minOrderAmount = dto.minOrderAmount ?? null;
+    if (dto.maxUses !== undefined) coupon.maxUses = dto.maxUses ?? null;
+    if (dto.expiresAt !== undefined) coupon.expiresAt = dto.expiresAt ?? null;
+    if (dto.isActive !== undefined) coupon.isActive = dto.isActive;
+
+    if (
+      coupon.discountType === DiscountType.PERCENTAGE &&
+      Number(coupon.discountValue) > 100
+    ) {
+      throw AppError.badRequest(
+        'Percentage discount cannot exceed 100',
+        ErrorCode.BAD_REQUEST,
+      );
+    }
+
+    const saved = await this.couponRepo.save(coupon);
+    await this.audit.record({
+      action: 'coupon.updated',
+      entityType: 'coupon',
+      entityId: id,
+      metadata: {
+        code: saved.code,
+        discountType: saved.discountType,
+        discountValue: saved.discountValue,
+        minOrderAmount: saved.minOrderAmount,
+        maxUses: saved.maxUses,
+        expiresAt: saved.expiresAt,
+      },
+    });
+    return saved;
   }
 
   async deactivate(id: number): Promise<Coupon> {
     const coupon = await this.findOne(id);
     coupon.isActive = false;
-    return this.couponRepo.save(coupon);
+    const saved = await this.couponRepo.save(coupon);
+    await this.audit.record({
+      action: 'coupon.deactivated',
+      entityType: 'coupon',
+      entityId: id,
+      metadata: { code: coupon.code },
+    });
+    return saved;
   }
 
   async remove(id: number): Promise<{ message: string }> {
     const coupon = await this.findOne(id);
+    const code = coupon.code;
     await this.couponRepo.remove(coupon);
+    await this.audit.record({
+      action: 'coupon.deleted',
+      entityType: 'coupon',
+      entityId: id,
+      metadata: { code },
+    });
     return { message: 'Coupon deleted' };
   }
 

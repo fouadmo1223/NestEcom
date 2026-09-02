@@ -28,14 +28,29 @@ export class AuditLogController {
     const p = Math.max(1, Number(page) || 1);
     const l = Math.min(100, Math.max(1, Number(limit) || 30));
 
-    const qb = this.repo.createQueryBuilder('a').orderBy('a.createdAt', 'DESC');
-    if (action) qb.andWhere('a.action ILIKE :action', { action: `%${action}%` });
-    if (entityType) qb.andWhere('a.entityType = :entityType', { entityType });
+    const qb = this.repo
+      .createQueryBuilder('a')
+      .leftJoin('users', 'actor', 'actor.id = a."actorId"')
+      .addSelect(['actor.username', 'actor.email'])
+      .orderBy('a.createdAt', 'DESC');
+    if (action) {
+      qb.andWhere('(a.action ILIKE :q OR a."entityType" ILIKE :q)', { q: `%${action}%` });
+    }
+    if (entityType) qb.andWhere('a."entityType" = :entityType', { entityType });
 
-    const [data, total] = await qb
+    const { entities, raw } = await qb
       .skip((p - 1) * l)
       .take(l)
-      .getManyAndCount();
+      .getRawAndEntities();
+    const total = await qb.getCount();
+
+    const data = entities.map((e, i) => ({
+      ...e,
+      actorName:
+        (raw[i] as { actor_username?: string; actor_email?: string })?.actor_username ??
+        (raw[i] as { actor_email?: string })?.actor_email ??
+        null,
+    }));
     return { data, pagination: { total, page: p, limit: l, totalPages: Math.ceil(total / l) } };
   }
 }

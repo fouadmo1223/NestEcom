@@ -42,6 +42,12 @@ class UpdatePlatformSettingsDto {
   @IsOptional()
   @IsBoolean()
   freeShippingEnabled?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsNumber()
+  @Min(0)
+  defaultShippingFee?: number;
 }
 
 @ApiTags('Admin · Settings')

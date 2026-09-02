@@ -143,6 +143,9 @@ export class VendorsService {
         shipping: dto.shippingPolicy ?? store.policies?.shipping,
       };
     }
+    if (dto.shippingFee !== undefined) {
+      store.shippingFee = dto.shippingFee === null ? null : Number(dto.shippingFee);
+    }
     // Slug is intentionally immutable once created — it is a public URL.
     return this.stores.save(store);
   }
@@ -454,6 +457,7 @@ export class VendorsService {
       policies: store.policies,
       supportEmail: store.supportEmail,
       supportPhone: store.supportPhone,
+      shippingFee: store.shippingFee == null ? null : Number(store.shippingFee),
       rating: {
         average: store.vendor?.ratingAverage ?? 0,
         count: store.vendor?.ratingCount ?? 0,

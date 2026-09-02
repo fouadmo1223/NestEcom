@@ -10,6 +10,7 @@ import { CartItem } from '../cart/cart-item.entity';
 import { Address } from '../addresses/address.entity';
 import { Product } from '../products/product.entity';
 import { Vendor } from '../vendors/entities/vendor.entity';
+import { Store } from '../vendors/entities/store.entity';
 import { CouponsModule } from '../coupons/coupons.module';
 import { AuthModule } from '../auth/auth.module';
 import { MailModule } from '../mail/mail.module';
@@ -27,6 +28,7 @@ import { MoneyModule } from '../money/money.module';
       Address,
       Product,
       Vendor,
+      Store,
     ]),
     CouponsModule,
     AuthModule,

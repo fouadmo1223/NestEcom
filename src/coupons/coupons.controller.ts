@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, UseGua
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
 import { CouponsService } from './coupons.service';
 import { CreateCouponDto } from './dtos/create-coupon.dto';
+import { UpdateCouponDto } from './dtos/update-coupon.dto';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -38,6 +39,16 @@ export class CouponsController {
     @ApiResponse({ status: 201, description: 'Coupon created successfully.', type: Coupon })
     create(@Body() dto: CreateCouponDto) {
         return this.couponsService.create(dto);
+    }
+
+    @Patch(':id')
+    @ApiOperation({ summary: 'Update a coupon', description: 'Updates an existing coupon. Requires super admin privileges.' })
+    @ApiParam({ name: 'id', type: Number, description: 'Coupon ID' })
+    @ApiBody({ type: UpdateCouponDto })
+    @ApiResponse({ status: 200, description: 'Coupon updated successfully.', type: Coupon })
+    @ApiResponse({ status: 404, description: 'Coupon not found.' })
+    update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCouponDto) {
+        return this.couponsService.update(id, dto);
     }
 
     @Patch(':id/deactivate')

@@ -1,4 +1,14 @@
-import { Controller, Get, Param, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { ProductsQueryDto, VendorProductsQueryDto } from './dtos/products-query.dto';
@@ -28,6 +38,15 @@ export class ProductsController {
   @ApiOperation({ summary: 'List every product (any status/vendor) — super admin' })
   listAdmin(@Query() query: VendorProductsQueryDto) {
     return this.productsService.findAllAdmin(query);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(UserType.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete any product — super admin' })
+  removeAsAdmin(@Param('id', ParseIntPipe) id: number) {
+    return this.productsService.deleteAsAdmin(id);
   }
 
   @Get(':idOrSlug')

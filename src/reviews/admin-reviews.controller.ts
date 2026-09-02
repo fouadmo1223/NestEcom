@@ -17,6 +17,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UserType } from '../users/user.entity';
 import { AdminReviewsQueryDto, ModerateReviewDto } from './dtos/moderation.dtos';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @ApiTags('Admin · Reviews')
 @ApiBearerAuth()
@@ -30,12 +31,16 @@ export class AdminReviewsController {
   list(@Query() query: AdminReviewsQueryDto) {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
-    return this.reviews.findAll(page, limit, query.status);
+    return this.reviews.findAll(page, limit, query.status, query.search, query.sort);
   }
 
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
-  moderate(@Param('id', ParseIntPipe) id: number, @Body() dto: ModerateReviewDto) {
-    return this.reviews.setStatus(id, dto.status);
+  moderate(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ModerateReviewDto,
+    @CurrentUser() actor: { id: number },
+  ) {
+    return this.reviews.setStatus(id, dto.status, actor.id);
   }
 }

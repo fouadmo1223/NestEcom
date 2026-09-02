@@ -64,16 +64,22 @@ export class UsersController {
     @UseGuards(JwtGuard, RolesGuard)
     @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
     @HttpCode(HttpStatus.OK)
-    banUser(@Param('id', ParseIntPipe) id: number) {
-        return this.usersService.banUser(id);
+    banUser(
+        @Param('id', ParseIntPipe) id: number,
+        @CurrentUser() actor: { id: number },
+    ) {
+        return this.usersService.banUser(id, actor.id);
     }
 
     @Patch(':id/unban')
     @UseGuards(JwtGuard, RolesGuard)
     @Roles(UserType.ADMIN, UserType.SUPER_ADMIN)
     @HttpCode(HttpStatus.OK)
-    unbanUser(@Param('id', ParseIntPipe) id: number) {
-        return this.usersService.unbanUser(id);
+    unbanUser(
+        @Param('id', ParseIntPipe) id: number,
+        @CurrentUser() actor: { id: number },
+    ) {
+        return this.usersService.unbanUser(id, actor.id);
     }
 
     @Get(':id')

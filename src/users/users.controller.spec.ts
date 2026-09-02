@@ -110,16 +110,16 @@ describe('UsersController', () => {
     const result = { message: 'banned' };
     usersService.banUser.mockReturnValue(result);
 
-    expect(controller.banUser(4)).toBe(result);
-    expect(usersService.banUser).toHaveBeenCalledWith(4);
+    expect(controller.banUser(4, { id: 1 })).toBe(result);
+    expect(usersService.banUser).toHaveBeenCalledWith(4, 1);
   });
 
   it('unbanUser delegates to the service', () => {
     const result = { message: 'unbanned' };
     usersService.unbanUser.mockReturnValue(result);
 
-    expect(controller.unbanUser(4)).toBe(result);
-    expect(usersService.unbanUser).toHaveBeenCalledWith(4);
+    expect(controller.unbanUser(4, { id: 1 })).toBe(result);
+    expect(usersService.unbanUser).toHaveBeenCalledWith(4, 1);
   });
 
   it('getOne delegates to the service', () => {

@@ -11,6 +11,7 @@ export interface PlatformSettingsSnapshot {
   lowStockThreshold: number;
   reviewRequiresPurchase: boolean;
   freeShippingEnabled: boolean;
+  defaultShippingFee: number;
 }
 
 @Injectable()
@@ -46,6 +47,7 @@ export class PlatformSettingsService implements OnModuleInit {
           currency: this.config.get('PLATFORM_CURRENCY', 'EGP'),
           minPayout: this.envNum('PLATFORM_MIN_PAYOUT', 0),
           lowStockThreshold: Math.trunc(this.envNum('PLATFORM_LOW_STOCK_THRESHOLD', 5)),
+          defaultShippingFee: this.envNum('PLATFORM_DEFAULT_SHIPPING_FEE', 0),
         }),
       );
     }
@@ -71,6 +73,7 @@ export class PlatformSettingsService implements OnModuleInit {
         lowStockThreshold: this.cache.lowStockThreshold,
         reviewRequiresPurchase: this.cache.reviewRequiresPurchase,
         freeShippingEnabled: this.cache.freeShippingEnabled,
+        defaultShippingFee: Number(this.cache.defaultShippingFee),
       };
     }
     return {
@@ -80,6 +83,7 @@ export class PlatformSettingsService implements OnModuleInit {
       lowStockThreshold: Math.trunc(this.envNum('PLATFORM_LOW_STOCK_THRESHOLD', 5)),
       reviewRequiresPurchase: false,
       freeShippingEnabled: true,
+      defaultShippingFee: this.envNum('PLATFORM_DEFAULT_SHIPPING_FEE', 0),
     };
   }
 

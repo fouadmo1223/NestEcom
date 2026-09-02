@@ -22,4 +22,14 @@ export class AdminReviewsQueryDto extends PaginationDto {
   @IsOptional()
   @IsEnum(ReviewStatus)
   status?: ReviewStatus;
+
+  @ApiProperty({ required: false, description: 'Search by product title, reviewer username or email' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiProperty({ required: false, enum: ['newest', 'oldest'] })
+  @IsOptional()
+  @IsEnum({ newest: 'newest', oldest: 'oldest' })
+  sort?: 'newest' | 'oldest';
 }

@@ -10,6 +10,8 @@ import { Store } from '../vendors/entities/store.entity';
 import { VendorStatus } from '../vendors/entities/vendor.entity';
 import { AppError } from '../common/errors/app-exception';
 import { ErrorCode } from '../common/errors/error-codes';
+import { AuditService } from '../common/audit/audit.service';
+import { PlatformSettingsService } from '../platform/platform-settings.service';
 
 export interface CartItemView {
   id: number;
@@ -26,6 +28,8 @@ export class CartService {
     @InjectRepository(CartItem) private readonly cartRepository: Repository<CartItem>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
     @InjectRepository(Store) private readonly stores: Repository<Store>,
+    private readonly audit: AuditService,
+    private readonly settings: PlatformSettingsService,
   ) {}
 
   async getCart(userId: number) {
@@ -82,12 +86,27 @@ export class CartService {
     const subtotal = views.reduce((s, v) => s + v.lineTotal, 0);
     const itemCount = views.reduce((s, v) => s + v.quantity, 0);
 
+    // Preview the per-shipment delivery fee the same way checkout charges it:
+    // 0 when the marketplace is free-shipping, otherwise each store's own fee
+    // falling back to the platform default. One fee per vendor group.
+    const settingsNow = this.settings.current();
+    let shippingTotal = 0;
+    if (!settingsNow.freeShippingEnabled) {
+      for (const vendorId of groupsMap.keys()) {
+        const fee = storeByVendor.get(vendorId)?.shippingFee;
+        shippingTotal += fee != null ? Number(fee) : settingsNow.defaultShippingFee;
+      }
+    }
+    shippingTotal = round(shippingTotal);
+
     return {
       groups: [...groupsMap.values()],
       items: views,
       itemCount,
       subtotal: round(subtotal),
-      total: round(subtotal), // shipping/discount resolved at checkout
+      shippingTotal,
+      // Discount is only known once a coupon is applied at checkout.
+      total: round(subtotal + shippingTotal),
     };
   }
 
@@ -117,6 +136,13 @@ export class CartService {
         }),
       );
     }
+    await this.audit.record({
+      actorId: userId,
+      action: 'cart.item_added',
+      entityType: 'product',
+      entityId: dto.productId,
+      metadata: { title: product.title, quantity: dto.quantity, cartQuantity: desired },
+    });
     return this.getCart(userId);
   }
 

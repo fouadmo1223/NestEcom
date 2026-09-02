@@ -10,12 +10,14 @@ import { AdminVendorsController } from './admin-vendors.controller';
 import { VendorGuard } from './vendor.guard';
 import { AuthModule } from '../auth/auth.module';
 import { MailModule } from '../mail/mail.module';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Vendor, Store, VendorApplication, User]),
     AuthModule,
     MailModule,
+    CloudinaryModule,
   ],
   controllers: [VendorsController, AdminVendorsController],
   providers: [VendorsService, VendorGuard],

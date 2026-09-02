@@ -26,7 +26,13 @@ export class NotificationsListener {
         p.vendorCount > 1
           ? `Your order will arrive in ${p.vendorCount} shipments. Total ${p.currency} ${p.total.toFixed(2)}.`
           : `We've sent your order to the store. Total ${p.currency} ${p.total.toFixed(2)}.`,
-      data: { orderId: p.orderId, href: `/orders/${p.orderId}` },
+      data: {
+        orderId: p.orderId,
+        href: `/orders/${p.orderId}`,
+        total: p.total,
+        currency: p.currency,
+        vendorCount: p.vendorCount,
+      },
     });
   }
 
@@ -37,7 +43,12 @@ export class NotificationsListener {
       type: NotificationEvent.VENDOR_ORDER_NEW,
       title: 'New order to fulfil',
       body: `Shipment #${p.vendorOrderId} — ${p.itemCount} item(s) from order #${p.customerOrderId}.`,
-      data: { vendorOrderId: p.vendorOrderId, href: '/orders' },
+      data: {
+        vendorOrderId: p.vendorOrderId,
+        customerOrderId: p.customerOrderId,
+        itemCount: p.itemCount,
+        href: '/orders',
+      },
     });
   }
 
@@ -50,7 +61,11 @@ export class NotificationsListener {
       body: p.trackingNumber
         ? `Order #${p.customerOrderId} shipped — tracking ${p.trackingNumber}.`
         : `Part of order #${p.customerOrderId} has shipped.`,
-      data: { orderId: p.customerOrderId, href: `/orders/${p.customerOrderId}` },
+      data: {
+        orderId: p.customerOrderId,
+        trackingNumber: p.trackingNumber ?? null,
+        href: `/orders/${p.customerOrderId}`,
+      },
     });
   }
 
@@ -61,7 +76,10 @@ export class NotificationsListener {
       type: NotificationEvent.VENDOR_ORDER_DELIVERED,
       title: 'Delivered',
       body: `A shipment from order #${p.customerOrderId} was delivered.`,
-      data: { orderId: p.customerOrderId, href: `/orders/${p.customerOrderId}` },
+      data: {
+        orderId: p.customerOrderId,
+        href: `/orders/${p.customerOrderId}`,
+      },
     });
   }
 
@@ -74,7 +92,12 @@ export class NotificationsListener {
       body: p.approved
         ? `${p.storeName} is live. Open the dashboard to set it up.`
         : `We couldn't approve your application${p.reason ? `: ${p.reason}` : '.'}`,
-      data: { href: p.approved ? '/' : '/sell/apply' },
+      data: {
+        approved: p.approved,
+        storeName: p.storeName,
+        reason: p.reason ?? null,
+        href: p.approved ? '/' : '/sell/apply',
+      },
     });
   }
 
@@ -90,7 +113,12 @@ export class NotificationsListener {
       type: NotificationEvent.PAYOUT_PROCESSED,
       title: `Payout ${label[p.status] ?? p.status}`,
       body: `Your payout request of ${p.amount.toFixed(2)} was ${label[p.status] ?? p.status}.`,
-      data: { payoutId: p.payoutId, href: '/payouts' },
+      data: {
+        payoutId: p.payoutId,
+        status: p.status,
+        amount: p.amount,
+        href: '/payouts',
+      },
     });
   }
 
@@ -101,7 +129,12 @@ export class NotificationsListener {
       type: NotificationEvent.REVIEW_CREATED,
       title: `New ${p.rating}★ review`,
       body: `"${p.productTitle}" received a new review.`,
-      data: { productId: p.productId, href: '/products' },
+      data: {
+        productId: p.productId,
+        productTitle: p.productTitle,
+        rating: p.rating,
+        href: '/products',
+      },
       push: false,
     });
   }
@@ -113,7 +146,12 @@ export class NotificationsListener {
       type: NotificationEvent.PRODUCT_LOW_STOCK,
       title: 'Low stock',
       body: `"${p.productTitle}" is down to ${p.stock} left.`,
-      data: { productId: p.productId, href: '/products' },
+      data: {
+        productId: p.productId,
+        productTitle: p.productTitle,
+        stock: p.stock,
+        href: '/products',
+      },
     });
   }
 }

@@ -46,4 +46,19 @@ export class AdminOrdersQueryDto extends VendorOrdersQueryDto {
   @IsOptional()
   @IsIn(['pending', 'partially_fulfilled', 'fulfilled', 'cancelled'])
   rollupStatus?: string;
+
+  @ApiProperty({ required: false, description: 'Minimum order total' })
+  @IsOptional()
+  @IsNumberString()
+  minTotal?: string;
+
+  @ApiProperty({ required: false, description: 'Maximum order total' })
+  @IsOptional()
+  @IsNumberString()
+  maxTotal?: string;
+
+  @ApiProperty({ required: false, enum: ['newest', 'oldest'] })
+  @IsOptional()
+  @IsIn(['newest', 'oldest'])
+  sort?: 'newest' | 'oldest';
 }
