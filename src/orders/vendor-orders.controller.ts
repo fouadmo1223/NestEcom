@@ -47,7 +47,7 @@ export class VendorOrdersController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateVendorOrderStatusDto,
   ) {
-    return this.ordersService.updateVendorOrderStatus(vendor.id, id, dto);
+    return this.ordersService.updateVendorOrderStatus(vendor.id, id, dto, vendor.userId);
   }
 
   @Patch(':id/cancel')

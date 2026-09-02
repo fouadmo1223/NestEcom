@@ -8,6 +8,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { decimalTransformer } from '../../common/transformers/decimal.transformer';
 import { Vendor } from './vendor.entity';
 
 export interface StorePolicies {
@@ -57,6 +58,10 @@ export class Store {
 
   @Column({ type: 'json', nullable: true })
   policies!: StorePolicies | null;
+
+  /** Per-shipment delivery fee. `null` → use the platform default. */
+  @Column('decimal', { precision: 10, scale: 2, nullable: true, transformer: decimalTransformer })
+  shippingFee!: number | null;
 
   @Column({ default: true })
   isActive!: boolean;

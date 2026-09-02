@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsEmail,
@@ -106,6 +106,13 @@ export class UpdateStoreDto {
   @IsString()
   @MaxLength(2000)
   shippingPolicy?: string;
+
+  @ApiProperty({ required: false, description: 'Delivery fee per shipment. null → platform default.' })
+  @IsOptional()
+  @Transform(({ value }) => (value === '' || value === null ? null : Number(value)))
+  @IsNumber()
+  @Min(0)
+  shippingFee?: number | null;
 }
 
 export enum ApplicationReviewAction {

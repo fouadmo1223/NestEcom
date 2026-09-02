@@ -13,6 +13,10 @@ export class Category {
     @Column({ type: 'varchar', unique: true })
     name!: string;
 
+    @ApiProperty({ example: 'إلكترونيات', description: 'Arabic name', nullable: true })
+    @Column({ type: 'varchar', nullable: true })
+    nameAr!: string | null;
+
     @ApiProperty({ example: 'http://example.com/image.jpg', description: 'The URL of the category image' })
     @Column({ type: 'varchar', nullable: true })
     image!: string | null;

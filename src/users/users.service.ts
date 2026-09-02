@@ -16,6 +16,7 @@ import { RegisterDto } from './dtos/register.dto';
 import { LoginDto } from './dtos/login.dto';
 import { UpdateUserDto } from './dtos/update-user.dto';
 import { MailService } from '../mail/mail.service';
+import { AuditService } from '../common/audit/audit.service';
 
 const OTP_RATE_LIMIT_MS = 5 * 60 * 1000; // 5 minutes
 const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
@@ -41,6 +42,7 @@ export class UsersService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly mailService: MailService,
+    private readonly audit: AuditService,
   ) {}
 
   async findAll(page: number, limit: number) {
@@ -51,9 +53,11 @@ export class UsersService {
         email: true,
         userType: true,
         isAccountVerified: true,
+        isBanned: true,
         createdAt: true,
         updatedAt: true,
       },
+      order: { createdAt: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -172,7 +176,16 @@ export class UsersService {
       throw new ForbiddenException('Access denied');
     }
 
-    return this.usersRepository.remove(user);
+    const username = user.username;
+    const removed = await this.usersRepository.remove(user);
+    await this.audit.record({
+      actorId: currentUser.id,
+      action: 'user.deleted',
+      entityType: 'user',
+      entityId: id,
+      metadata: { username },
+    });
+    return removed;
   }
 
   async getCurrentUser(id: number): Promise<Omit<User, 'password'>> {
@@ -236,19 +249,33 @@ export class UsersService {
 
   // ─── Ban / Unban ─────────────────────────────────────────────────────────
 
-  async banUser(id: number): Promise<{ message: string }> {
+  async banUser(id: number, actorId?: number): Promise<{ message: string }> {
     const user = await this.findOneWithPassword(id);
     if (user.isBanned) throw new BadRequestException('User is already banned');
     user.isBanned = true;
     await this.usersRepository.save(user);
+    await this.audit.record({
+      actorId: actorId ?? null,
+      action: 'user.banned',
+      entityType: 'user',
+      entityId: id,
+      metadata: { username: user.username },
+    });
     return { message: `User "${user.username}" has been banned` };
   }
 
-  async unbanUser(id: number): Promise<{ message: string }> {
+  async unbanUser(id: number, actorId?: number): Promise<{ message: string }> {
     const user = await this.findOneWithPassword(id);
     if (!user.isBanned) throw new BadRequestException('User is not banned');
     user.isBanned = false;
     await this.usersRepository.save(user);
+    await this.audit.record({
+      actorId: actorId ?? null,
+      action: 'user.unbanned',
+      entityType: 'user',
+      entityId: id,
+      metadata: { username: user.username },
+    });
     return { message: `User "${user.username}" has been unbanned` };
   }
 

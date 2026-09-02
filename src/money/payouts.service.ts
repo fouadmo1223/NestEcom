@@ -147,7 +147,31 @@ export class PayoutsService {
       skip: (page - 1) * limit,
       take: limit,
     });
-    return { data, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+
+    // attach store name + vendor available balance for the admin table
+    const rows: Array<Payout & { storeName?: string; vendorBalance?: number }> = data;
+    if (rows.length) {
+      const vendorIds = [...new Set(rows.map((p) => p.vendorId))];
+      const stores = await this.payouts.manager.query(
+        `SELECT s."vendorId" AS vid, s.name, v.balance
+           FROM stores s JOIN vendors v ON v.id = s."vendorId"
+          WHERE s."vendorId" = ANY($1)`,
+        [vendorIds],
+      );
+      const byVendor = new Map(
+        (stores as { vid: number; name: string; balance: string }[]).map((r) => [
+          r.vid,
+          { name: r.name, balance: Number(r.balance) },
+        ]),
+      );
+      for (const p of rows) {
+        const info = byVendor.get(p.vendorId);
+        p.storeName = info?.name;
+        p.vendorBalance = info?.balance;
+      }
+    }
+
+    return { data: rows, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } };
   }
 
   async process(id: number, dto: ProcessPayoutDto, adminId: number): Promise<Payout> {

@@ -21,6 +21,24 @@ export enum ProductStatus {
   ARCHIVED = 'archived',
 }
 
+export interface ProductVariant {
+  /** Stable id within the product (uuid or slug of the name). */
+  id: string;
+  /** Human label (English), e.g. "Small / Black". */
+  name: string;
+  /** Optional Arabic label shown on RTL surfaces. */
+  nameAr?: string | null;
+  price: number;
+  /** Struck-through "was" price for this variant when on sale. */
+  compareAtPrice?: number | null;
+  stock: number;
+  /** Cover image for this variant (falls back to the product image). */
+  image?: string | null;
+  /** Structured options, e.g. { Size: "S", Color: "Black" }. */
+  options?: Record<string, string>;
+  sku?: string | null;
+}
+
 @Entity({ name: 'products' })
 @Index(['vendorId', 'slug'], { unique: true })
 @Index(['status', 'createdAt'])
@@ -32,14 +50,34 @@ export class Product {
   @Column()
   title!: string;
 
+  /** Optional Arabic title shown on RTL surfaces (falls back to `title`). */
+  @Column({ type: 'varchar', nullable: true })
+  titleAr!: string | null;
+
   @Column({ type: 'varchar' })
   slug!: string;
 
   @Column('decimal', { precision: 10, scale: 2, transformer: decimalTransformer })
   price!: number;
 
+  /**
+   * The "was" price shown struck-through when the product is on sale. When set
+   * and greater than `price`, the storefront renders it as a discount.
+   */
+  @Column('decimal', {
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: decimalTransformer,
+  })
+  compareAtPrice!: number | null;
+
   @Column({ type: 'varchar', length: 255, nullable: true })
   description!: string | null;
+
+  /** Optional Arabic description (falls back to `description`). */
+  @Column({ type: 'varchar', length: 2000, nullable: true })
+  descriptionAr!: string | null;
 
   /** Derived primary image URL (kept in sync with images[position=0]). */
   @Column({ type: 'varchar', nullable: true })
@@ -47,6 +85,14 @@ export class Product {
 
   @Column({ type: 'int', default: 0 })
   stock!: number;
+
+  /**
+   * Optional purchasable variants (size / colour / …). When present, each
+   * variant carries its own price and stock; the product-level `price`/`stock`
+   * act as the default / fallback.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  variants!: ProductVariant[] | null;
 
   @Column('simple-array', { nullable: true })
   tags!: string[] | null;

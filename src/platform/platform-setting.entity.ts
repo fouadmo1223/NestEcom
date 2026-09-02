@@ -32,6 +32,10 @@ export class PlatformSetting {
   @Column({ default: true })
   freeShippingEnabled!: boolean;
 
+  @ApiProperty({ example: 30, description: 'Default delivery fee per shipment (when not free and a store has no override)' })
+  @Column('decimal', { precision: 10, scale: 2, default: 0, transformer: decimalTransformer })
+  defaultShippingFee!: number;
+
   @UpdateDateColumn()
   updatedAt!: Date;
 }

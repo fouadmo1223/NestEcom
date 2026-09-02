@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -8,10 +9,15 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { VendorsService } from './vendors.service';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { imageMulterOptions } from '../uploads/multer.config';
 import { JwtGuard } from '../auth/jwt.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { ApplyVendorDto, UpdateStoreDto, VendorListQueryDto } from './dtos/vendor.dtos';
@@ -19,7 +25,10 @@ import { ApplyVendorDto, UpdateStoreDto, VendorListQueryDto } from './dtos/vendo
 @ApiTags('Vendors')
 @Controller('vendors')
 export class VendorsController {
-  constructor(private readonly vendorsService: VendorsService) {}
+  constructor(
+    private readonly vendorsService: VendorsService,
+    private readonly cloudinary: CloudinaryService,
+  ) {}
 
   // ─── Authenticated: self ──────────────────────────────────────────────
 
@@ -50,6 +59,28 @@ export class VendorsController {
   @HttpCode(HttpStatus.OK)
   updateMyStore(@CurrentUser() user: { id: number }, @Body() dto: UpdateStoreDto) {
     return this.vendorsService.updateMyStore(user.id, dto);
+  }
+
+  @Patch('me/store/image')
+  @UseGuards(JwtGuard)
+  @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor('image', imageMulterOptions))
+  async uploadStoreImage(
+    @CurrentUser() user: { id: number },
+    @UploadedFile() file: Express.Multer.File,
+    @Body('kind') kind: string,
+  ) {
+    if (!file) throw new BadRequestException('No image uploaded');
+    if (kind !== 'logo' && kind !== 'cover') {
+      throw new BadRequestException('kind must be "logo" or "cover"');
+    }
+    const url = await this.cloudinary.uploadFile(file.buffer, 'stores');
+    return this.vendorsService.updateMyStore(
+      user.id,
+      kind === 'logo' ? { logo: url } : { coverImage: url },
+    );
   }
 
   // ─── Public storefront ────────────────────────────────────────────────

@@ -1,7 +1,7 @@
-import { Controller, DefaultValuePipe, Get, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AnalyticsService } from './analytics.service';
-import { AnalyticsDateRangeDto } from './dtos/analytics-date-range.dto';
+import { AnalyticsDateRangeDto, RankedRangeDto } from './dtos/analytics-date-range.dto';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -31,8 +31,8 @@ export class AdminAnalyticsController {
   }
 
   @Get('top-vendors')
-  topVendors(@Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number) {
-    return this.analytics.topVendors(limit);
+  topVendors(@Query() { limit, startDate, endDate }: RankedRangeDto) {
+    return this.analytics.topVendors(limit ?? 10, startDate, endDate);
   }
 
   @Get('vendor-growth')

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, DataSource, Repository } from 'typeorm';
+import { Brackets, DataSource, In, Repository } from 'typeorm';
 import {
   CustomerOrder,
   CustomerOrderStatus,
@@ -13,6 +13,7 @@ import { CartItem } from '../cart/cart-item.entity';
 import { Address } from '../addresses/address.entity';
 import { Product, ProductStatus } from '../products/product.entity';
 import { Vendor, VendorStatus } from '../vendors/entities/vendor.entity';
+import { Store } from '../vendors/entities/store.entity';
 import { InventoryService } from '../products/inventory.service';
 import { InventoryReason } from '../products/entities/inventory-log.entity';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -32,6 +33,7 @@ import {
 import { rollupStatus, canTransition, PRE_SHIPMENT } from './order-status.util';
 import { AppError } from '../common/errors/app-exception';
 import { ErrorCode } from '../common/errors/error-codes';
+import { AuditService } from '../common/audit/audit.service';
 
 type Actor = { id: number; userType: UserType; email?: string };
 const round = (n: number) => Math.round(n * 100) / 100;
@@ -44,6 +46,8 @@ export class OrdersService {
     @InjectRepository(CartItem) private readonly carts: Repository<CartItem>,
     @InjectRepository(Address) private readonly addresses: Repository<Address>,
     @InjectRepository(Vendor) private readonly vendors: Repository<Vendor>,
+    @InjectRepository(OrderItem) private readonly orderItems: Repository<OrderItem>,
+    @InjectRepository(Store) private readonly stores: Repository<Store>,
     private readonly inventory: InventoryService,
     private readonly coupons: CouponsService,
     private readonly ledger: LedgerService,
@@ -51,6 +55,7 @@ export class OrdersService {
     private readonly events: EventEmitter2,
     private readonly settings: PlatformSettingsService,
     private readonly dataSource: DataSource,
+    private readonly audit: AuditService,
   ) {}
 
   private get lowStockThreshold(): number {
@@ -125,9 +130,30 @@ export class OrdersService {
       for (const a of evalResult.allocations) allocationByVendor.set(a.vendorId, a.amount);
     }
 
-    const grandTotal = round(Math.max(0, subtotal - discountTotal));
     const rate = this.defaultCommissionRate;
-    const currency = this.settings.current().currency;
+    const settingsNow = this.settings.current();
+    const currency = settingsNow.currency;
+
+    // Per-shipment delivery fee: 0 when the marketplace is free-shipping,
+    // otherwise the store's own fee, falling back to the platform default.
+    const shippingByVendor = new Map<number, number>();
+    if (!settingsNow.freeShippingEnabled) {
+      const storeRows = await this.stores.find({
+        where: { vendorId: In([...byVendor.keys()]) },
+      });
+      const feeByVendor = new Map(storeRows.map((s) => [s.vendorId, s.shippingFee]));
+      for (const vId of byVendor.keys()) {
+        const fee = feeByVendor.get(vId);
+        shippingByVendor.set(
+          vId,
+          round(fee != null ? Number(fee) : settingsNow.defaultShippingFee),
+        );
+      }
+    }
+    const shippingTotal = round(
+      [...shippingByVendor.values()].reduce((s, v) => s + v, 0),
+    );
+    const grandTotal = round(Math.max(0, subtotal - discountTotal) + shippingTotal);
 
     const shippingAddress = {
       fullName: address.fullName,
@@ -164,7 +190,7 @@ export class OrdersService {
           paymentStatus: PaymentStatus.PENDING,
           subtotal,
           discountTotal,
-          shippingTotal: 0,
+          shippingTotal,
           taxTotal: 0,
           grandTotal,
           currency,
@@ -180,9 +206,12 @@ export class OrdersService {
         const vendor = await vendorRepo.findOneBy({ id: vendorId });
         const commissionRate = vendor?.commissionRate ?? rate;
         const discountAllocated = allocationByVendor.get(vendorId) ?? 0;
-        const total = round(group.subtotal - discountAllocated);
-        const commissionAmount = round(total * commissionRate);
-        const vendorEarnings = round(total - commissionAmount);
+        const shippingAllocated = shippingByVendor.get(vendorId) ?? 0;
+        const merchandiseTotal = round(group.subtotal - discountAllocated);
+        // Commission is charged on merchandise only, not on the delivery fee.
+        const commissionAmount = round(merchandiseTotal * commissionRate);
+        const total = round(merchandiseTotal + shippingAllocated);
+        const vendorEarnings = round(merchandiseTotal - commissionAmount + shippingAllocated);
 
         const savedVendorOrder = await vendorOrderRepo.save(
           vendorOrderRepo.create({
@@ -191,7 +220,7 @@ export class OrdersService {
             status: VendorOrderStatus.PENDING,
             subtotal: group.subtotal,
             discountAllocated,
-            shippingAllocated: 0,
+            shippingAllocated,
             total,
             commissionRate,
             commissionAmount,
@@ -263,6 +292,19 @@ export class OrdersService {
       this.events.emit(NotificationEvent.PRODUCT_LOW_STOCK, ev);
     }
 
+    await this.audit.record({
+      actorId: userId,
+      action: 'order.placed',
+      entityType: 'order',
+      entityId: full.id,
+      metadata: {
+        total: Number(full.grandTotal),
+        currency: full.currency,
+        vendors: full.vendorOrders.length,
+        items: full.vendorOrders.reduce((s, vo) => s + (vo.items?.length ?? 0), 0),
+      },
+    });
+
     return full;
   }
 
@@ -270,16 +312,19 @@ export class OrdersService {
 
   async findMyOrders(userId: number, query: MyOrdersQueryDto) {
     const { page, limit } = this.paginate(query);
-    const qb = this.orders
-      .createQueryBuilder('o')
-      .where('o.userId = :userId', { userId })
-      .orderBy('o.placedAt', 'DESC');
-    if (query.status) qb.andWhere('o.status = :status', { status: query.status });
-
-    const [data, total] = await qb
-      .skip((page - 1) * limit)
-      .take(limit)
-      .getManyAndCount();
+    // `find` (not a bare QueryBuilder) so the eager vendorOrders → items
+    // relations load — the storefront list needs item / shipment counts.
+    const [data, total] = await this.orders.findAndCount({
+      where: {
+        userId,
+        ...(query.status
+          ? { status: query.status as CustomerOrderStatus }
+          : {}),
+      },
+      order: { placedAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
     return { data, pagination: this.meta(total, page, limit) };
   }
 
@@ -351,6 +396,22 @@ export class OrdersService {
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
+
+    // items is a to-many collection — load it separately rather than joining
+    // it into the paginated query (join + skip/take fans out rows).
+    if (data.length) {
+      const items = await this.orderItems.find({
+        where: { vendorOrderId: In(data.map((vo) => vo.id)) },
+      });
+      const byShipment = new Map<number, OrderItem[]>();
+      for (const it of items) {
+        const list = byShipment.get(it.vendorOrderId) ?? [];
+        list.push(it);
+        byShipment.set(it.vendorOrderId, list);
+      }
+      for (const vo of data) vo.items = byShipment.get(vo.id) ?? [];
+    }
+
     return { data, pagination: this.meta(total, page, limit) };
   }
 
@@ -367,6 +428,7 @@ export class OrdersService {
     vendorId: number,
     id: number,
     dto: UpdateVendorOrderStatusDto,
+    actorId?: number,
   ): Promise<VendorOrder> {
     const vo = await this.vendorOrders.findOne({
       where: { id, vendorId },
@@ -423,6 +485,18 @@ export class OrdersService {
       });
     }
 
+    await this.audit.record({
+      actorId: actorId ?? null,
+      action: 'order.status_changed',
+      entityType: 'vendor_order',
+      entityId: vo.id,
+      metadata: {
+        status: dto.status,
+        customerOrderId: vo.customerOrderId,
+        ...(dto.trackingNumber ? { trackingNumber: dto.trackingNumber } : {}),
+      },
+    });
+
     return this.getVendorOrder(vendorId, id);
   }
 
@@ -461,7 +535,7 @@ export class OrdersService {
     const qb = this.orders
       .createQueryBuilder('o')
       .leftJoinAndSelect('o.user', 'u')
-      .orderBy('o.placedAt', 'DESC');
+      .orderBy('o.placedAt', query.sort === 'oldest' ? 'ASC' : 'DESC');
 
     if (query.rollupStatus) qb.andWhere('o.status = :rs', { rs: query.rollupStatus });
     if (query.from) qb.andWhere('o.placedAt >= :from', { from: query.from });
@@ -472,6 +546,8 @@ export class OrdersService {
         { vid: Number(query.vendorId) },
       );
     }
+    if (query.minTotal) qb.andWhere('o."grandTotal" >= :minTotal', { minTotal: Number(query.minTotal) });
+    if (query.maxTotal) qb.andWhere('o."grandTotal" <= :maxTotal', { maxTotal: Number(query.maxTotal) });
     if (query.search) {
       qb.andWhere(
         new Brackets((w) => {
@@ -486,6 +562,24 @@ export class OrdersService {
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
+
+    // attach each order's shipments (+ items) — eager relations don't load
+    // through the QueryBuilder, and the admin list needs the store count.
+    if (data.length) {
+      const shipments = await this.vendorOrders.find({
+        where: { customerOrderId: In(data.map((o) => o.id)) },
+        relations: { items: true },
+        order: { id: 'ASC' },
+      });
+      const byOrder = new Map<number, VendorOrder[]>();
+      for (const vo of shipments) {
+        const list = byOrder.get(vo.customerOrderId) ?? [];
+        list.push(vo);
+        byOrder.set(vo.customerOrderId, list);
+      }
+      for (const o of data) o.vendorOrders = byOrder.get(o.id) ?? [];
+    }
+
     return { data, pagination: this.meta(total, page, limit) };
   }
 

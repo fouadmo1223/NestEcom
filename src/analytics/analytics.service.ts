@@ -152,16 +152,23 @@ export class AnalyticsService {
     );
   }
 
-  async topVendors(limit = 10) {
-    const rows = await this.vendorOrders
+  async topVendors(limit = 10, startDate?: string, endDate?: string) {
+    const qb = this.vendorOrders
       .createQueryBuilder('vo')
       .select('vo.vendorId', 'vendorId')
       .addSelect('SUM(vo.total)', 'gmv')
+      // Commission is charged on merchandise net of discount — not on the
+      // delivery fee — so the effective-rate column must divide by the same
+      // base, otherwise every vendor shows a rate below the configured one.
+      .addSelect('SUM(vo.subtotal - vo.discountAllocated)', 'net')
       .addSelect('SUM(vo.commissionAmount)', 'commission')
       .addSelect('COUNT(vo.id)', 'orders')
       .leftJoin('stores', 'store', 'store."vendorId" = vo.vendorId')
       .addSelect('store.name', 'storeName')
-      .where('vo.status != :c', { c: VendorOrderStatus.CANCELLED })
+      .where('vo.status != :c', { c: VendorOrderStatus.CANCELLED });
+    if (startDate) qb.andWhere('vo."createdAt" >= :startDate', { startDate });
+    if (endDate) qb.andWhere('vo."createdAt" <= :endDate', { endDate });
+    const rows = await qb
       .groupBy('vo.vendorId')
       .addGroupBy('store.name')
       .orderBy('SUM(vo.total)', 'DESC')
@@ -170,6 +177,7 @@ export class AnalyticsService {
         vendorId: string;
         storeName: string;
         gmv: string;
+        net: string;
         commission: string;
         orders: string;
       }>();
@@ -177,6 +185,7 @@ export class AnalyticsService {
       vendorId: parseInt(r.vendorId),
       storeName: r.storeName ?? `Vendor #${r.vendorId}`,
       gmv: round(parseFloat(r.gmv)),
+      netSales: round(parseFloat(r.net)),
       commission: round(parseFloat(r.commission)),
       orders: parseInt(r.orders),
     }));
