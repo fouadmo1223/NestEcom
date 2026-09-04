@@ -11,6 +11,7 @@ import { VerifyAccountDto, ResendVerificationDto } from '../users/dtos/verify-ac
 import { SendResetOtpDto } from '../users/dtos/send-reset-otp.dto';
 import { ResetPasswordDto } from '../users/dtos/reset-password.dto';
 import { GoogleExchangeDto } from './dtos/google-exchange.dto';
+import { GoogleAuthGuard } from './google-auth.guard';
 import { RefreshDto } from './dtos/refresh.dto';
 import { JwtGuard } from './jwt.guard';
 import { CurrentUser } from './current-user.decorator';
@@ -114,9 +115,11 @@ export class AuthController {
     // ─── Google OAuth ────────────────────────────────────────────────────────
 
     @Get('google')
-    @UseGuards(AuthGuard('google'))
+    @UseGuards(GoogleAuthGuard)
     googleLogin() {
-        // Passport redirects to Google — no body needed.
+        // Passport redirects to Google — no body needed. `?client=mobile` rides
+        // along in the OAuth `state` param (see GoogleAuthGuard) so the callback
+        // below knows to hand the code back to the app instead of the website.
     }
 
     @Get('google/callback')
@@ -124,10 +127,14 @@ export class AuthController {
     googleCallback(@Req() req: Request, @Res() res: Response) {
         const user = req.user as User;
         const code = this.usersService.issueGoogleAuthCode(user);
-        const target = this.config.get<string>(
-            'OAUTH_SUCCESS_REDIRECT',
-            `${this.config.get('WEB_URL', 'http://localhost:3000')}/auth/callback`,
-        );
+
+        const isMobile = req.query.state === 'mobile';
+        const target = isMobile
+            ? `${this.config.get<string>('MOBILE_APP_SCHEME', 'souq')}://auth/callback`
+            : this.config.get<string>(
+                  'OAUTH_SUCCESS_REDIRECT',
+                  `${this.config.get('WEB_URL', 'http://localhost:3000')}/auth/callback`,
+              );
         const url = new URL(target);
         url.searchParams.set('code', code);
         return res.redirect(url.toString());
